@@ -68,7 +68,7 @@ void cycleCounterInit(void)
 
 #if defined(DWT_LAR_UNLOCK_VALUE)
 #if defined(STM32F7) || defined(STM32H7)
-    DWT->LAR = DWT_LAR_UNLOCK_VALUE;
+    ITM->LAR = DWT_LAR_UNLOCK_VALUE;
 #elif defined(STM32F3) || defined(STM32F4)
     // Note: DWT_Type does not contain LAR member.
 #define DWT_LAR
@@ -146,14 +146,24 @@ uint32_t micros(void)
     return (ms * 1000) + (usTicks * 1000 - cycle_cnt) / usTicks;
 }
 
-inline uint32_t getCycleCounter(void)
+inline int32_t getCycleCounter(void)
 {
     return DWT->CYCCNT;
 }
 
-uint32_t clockCyclesToMicros(uint32_t clockCycles)
+inline int32_t clockCyclesToMicros(int32_t clockCycles)
 {
-    return clockCycles / usTicks;
+    return clockCycles / (int32_t)usTicks;
+}
+
+inline int32_t clockCyclesTo10thMicros(int32_t clockCycles)
+{
+    return 10 * clockCycles / (int32_t)usTicks;
+}
+
+inline int32_t clockMicrosToCycles(int32_t micros)
+{
+    return micros * (int32_t)usTicks;
 }
 
 // Return system uptime in milliseconds (rollover in 49 days)

@@ -25,6 +25,7 @@
 #include "common/axis.h"
 #include "common/maths.h"
 #include "common/sensor_alignment.h"
+#include "common/time.h"
 #include "drivers/exti.h"
 #include "drivers/bus.h"
 #include "drivers/sensor.h"
@@ -96,7 +97,20 @@ typedef struct gyroDev_s {
     mpuDetectionResult_t mpuDetectionResult;
     sensor_align_e gyroAlign;
     gyroRateKHz_e gyroRateKHz;
-    bool dataReady;
+    enum {
+        INIT = 0,
+        EXTI_INT_DMA,
+        EXTI_INT,
+        NO_EXTI_INT
+    } gyroModeSPI;
+#ifdef USE_GYRO_EXTI
+    uint32_t detectedEXTI;
+    int32_t gyroLastEXTI;
+    int32_t gyroSyncEXTI;
+    int32_t gyroShortPeriod;
+    int32_t gyroDmaMaxDuration;
+#endif
+    volatile bool dataReady;
     bool gyro_high_fsr;
     uint8_t hardware_lpf;
     uint8_t hardware_32khz_lpf;
