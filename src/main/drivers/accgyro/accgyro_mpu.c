@@ -129,6 +129,11 @@ busStatus_e mpuIntcallback(uint32_t arg)
 
 static void mpuIntExtiHandler(extiCallbackRec_t *cb)
 {
+    // Non-blocking, so this needs to be static
+    static busSegment_t segments[] = {
+            {NULL, NULL, 16, true, mpuIntcallback},
+            {NULL, NULL, 0, true, NULL},
+    };
     gyroDev_t *gyro = container_of(cb, gyroDev_t, exti);
 
     // Ideally we'd use a time to capture such information, but unfortunately the port used for EXTI interrupt does
@@ -142,11 +147,6 @@ static void mpuIntExtiHandler(extiCallbackRec_t *cb)
     gyro->gyroLastEXTI = nowCycles;
 
     if (gyro->gyroModeSPI == EXTI_INT_DMA) {
-        // Non-blocking, so this needs to be static
-        static busSegment_t segments[] = {
-                {NULL, NULL, 16, true, mpuIntcallback},
-                {NULL, NULL, 0, true, NULL},
-        };
         segments[0].txData = gyro->dev.txBuf;;
         segments[0].rxData = gyro->dev.rxBuf;
 
