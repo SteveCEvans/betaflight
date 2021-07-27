@@ -146,22 +146,22 @@ uint32_t micros(void)
     return (ms * 1000) + (usTicks * 1000 - cycle_cnt) / usTicks;
 }
 
-inline int32_t getCycleCounter(void)
+int32_t getCycleCounter(void)
 {
     return DWT->CYCCNT;
 }
 
-inline int32_t clockCyclesToMicros(int32_t clockCycles)
+int32_t clockCyclesToMicros(int32_t clockCycles)
 {
     return clockCycles / (int32_t)usTicks;
 }
 
-inline int32_t clockCyclesTo10thMicros(int32_t clockCycles)
+int32_t clockCyclesTo10thMicros(int32_t clockCycles)
 {
     return 10 * clockCycles / (int32_t)usTicks;
 }
 
-inline int32_t clockMicrosToCycles(int32_t micros)
+int32_t clockMicrosToCycles(int32_t micros)
 {
     return micros * (int32_t)usTicks;
 }
