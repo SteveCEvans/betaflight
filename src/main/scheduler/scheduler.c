@@ -52,7 +52,7 @@
 // 2 - time spent in scheduler
 // 3 - time spent executing check function
 
-// DEBUG_DETERMINISM, requires USE_LATE_TASK_STATISTICS to be defined
+// DEBUG_SCHEDULER_DETERMINISM, requires USE_LATE_TASK_STATISTICS to be defined
 // 0 - Gyro task start cycle time in 10th of a us
 // 1 - ID of late task
 // 2 - Amount task is late in 10th of a us
@@ -422,7 +422,7 @@ FAST_CODE void scheduler(void)
             } while (nowCycles < nextTargetCycles);
 #endif
 #if defined(SCHEDULER_DEBUG)
-            DEBUG_SET(DEBUG_DETERMINISM, 0, clockCyclesTo10thMicros(nowCycles - lastRealtimeStartCycles));
+            DEBUG_SET(DEBUG_SCHEDULER_DETERMINISM, 0, clockCyclesTo10thMicros(nowCycles - lastRealtimeStartCycles));
 #endif
             lastRealtimeStartCycles = nowCycles;
 
@@ -481,7 +481,7 @@ FAST_CODE void scheduler(void)
                     // Move the desired start time of the gyroTask
                     lastTargetCycles -= (accGyroSkew/GYRO_LOCK_COUNT);
 #if defined(SCHEDULER_DEBUG)
-                    DEBUG_SET(DEBUG_DETERMINISM, 3, clockCyclesTo10thMicros(accGyroSkew/GYRO_LOCK_COUNT));
+                    DEBUG_SET(DEBUG_SCHEDULER_DETERMINISM, 3, clockCyclesTo10thMicros(accGyroSkew/GYRO_LOCK_COUNT));
 #endif
                     accGyroSkew = 0;
                 }
@@ -570,8 +570,8 @@ FAST_CODE void scheduler(void)
 #if defined(USE_LATE_TASK_STATISTICS)
                 if (schedLoopRemainingCycles < 0) {
 #if defined(SCHEDULER_DEBUG)
-                    DEBUG_SET(DEBUG_DETERMINISM, 1, selectedTask - tasks);
-                    DEBUG_SET(DEBUG_DETERMINISM, 2, clockCyclesTo10thMicros(schedLoopRemainingCycles));
+                    DEBUG_SET(DEBUG_SCHEDULER_DETERMINISM, 1, selectedTask - tasks);
+                    DEBUG_SET(DEBUG_SCHEDULER_DETERMINISM, 2, clockCyclesTo10thMicros(schedLoopRemainingCycles));
 #endif
                     selectedTask->lateCount++ ;
                 }
