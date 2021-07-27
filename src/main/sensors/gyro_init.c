@@ -83,6 +83,11 @@
 #define ACTIVE_GYRO (&gyro.gyroSensor1)
 #endif
 
+// The gyro buffer is split 50/50, the first half for the transmit buffer, the second half for the receive buffer
+// This buffer is large enough for the gyros currently supported in accgyro_mpu.c but should be reviewed id other
+// gyro types are supported with SPI DMA.
+#define GYRO_BUF_SIZE 32
+
 static gyroDetectionFlags_t gyroDetectionFlags = GYRO_NONE_MASK;
 
 static uint16_t calculateNyquistAdjustedNotchHz(uint16_t notchHz, uint16_t notchCutoffHz)
