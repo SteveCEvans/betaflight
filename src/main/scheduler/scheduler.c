@@ -373,9 +373,7 @@ static void readSchedulerLocals(task_t *selectedTask, uint8_t selectedTaskDynami
 FAST_CODE void scheduler(void)
 {
     // Cache currentTime
-#if defined(SCHEDULER_DEBUG)
     const timeUs_t schedulerStartTimeUs = micros();
-#endif
     int32_t nowCycles;
     timeUs_t taskExecutionTimeUs = 0;
     task_t *selectedTask = NULL;
@@ -421,9 +419,7 @@ FAST_CODE void scheduler(void)
                 nowCycles = getCycleCounter();
             } while (nowCycles < nextTargetCycles);
 #endif
-#if defined(SCHEDULER_DEBUG)
             DEBUG_SET(DEBUG_SCHEDULER_DETERMINISM, 0, clockCyclesTo10thMicros(nowCycles - lastRealtimeStartCycles));
-#endif
             lastRealtimeStartCycles = nowCycles;
 
             timeUs_t currentTimeUs = clockCyclesToMicros(nowCycles);
@@ -480,9 +476,7 @@ FAST_CODE void scheduler(void)
 
                     // Move the desired start time of the gyroTask
                     lastTargetCycles -= (accGyroSkew/GYRO_LOCK_COUNT);
-#if defined(SCHEDULER_DEBUG)
                     DEBUG_SET(DEBUG_SCHEDULER_DETERMINISM, 3, clockCyclesTo10thMicros(accGyroSkew/GYRO_LOCK_COUNT));
-#endif
                     accGyroSkew = 0;
                 }
             }
@@ -569,10 +563,8 @@ FAST_CODE void scheduler(void)
                 }
 #if defined(USE_LATE_TASK_STATISTICS)
                 if (schedLoopRemainingCycles < 0) {
-#if defined(SCHEDULER_DEBUG)
                     DEBUG_SET(DEBUG_SCHEDULER_DETERMINISM, 1, selectedTask - tasks);
                     DEBUG_SET(DEBUG_SCHEDULER_DETERMINISM, 2, clockCyclesTo10thMicros(schedLoopRemainingCycles));
-#endif
                     selectedTask->lateCount++ ;
                 }
 #endif  // USE_LATE_TASK_STATISTICS
@@ -584,11 +576,7 @@ FAST_CODE void scheduler(void)
         }
     }
 
-#if defined(SCHEDULER_DEBUG)
     DEBUG_SET(DEBUG_SCHEDULER, 2, micros() - schedulerStartTimeUs - taskExecutionTimeUs); // time spent in scheduler
-#else
-    UNUSED(taskExecutionTimeUs);
-#endif
 
 #if defined(UNIT_TEST)
     readSchedulerLocals(selectedTask, selectedTaskDynamicPriority, waitingTasks);

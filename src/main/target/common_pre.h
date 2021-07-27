@@ -28,8 +28,6 @@
 // -Wpadded can be turned on to check padding of structs
 //#pragma GCC diagnostic warning "-Wpadded"
 
-#define SCHEDULER_DEBUG // define this to use scheduler debug[] values. Undefined by default for performance reasons
-
 #ifdef STM32F1
 #define MINIMAL_CLI
 // Using RX DMA disables the use of receive callbacks
