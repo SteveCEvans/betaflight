@@ -502,9 +502,7 @@ FAST_CODE void scheduler(void)
                         waitingTasks++;
                     } else if (task->checkFunc(currentTimeUs, cmpTimeUs(currentTimeUs, task->lastExecutedAtUs))) {
                         const uint32_t checkFuncExecutionTimeUs = micros() - currentTimeUs;
-#if defined(SCHEDULER_DEBUG)
                         DEBUG_SET(DEBUG_SCHEDULER, 3, checkFuncExecutionTimeUs);
-#endif
                         checkFuncMovingSumExecutionTimeUs += checkFuncExecutionTimeUs - checkFuncMovingSumExecutionTimeUs / TASK_STATS_MOVING_SUM_COUNT;
                         checkFuncMovingSumDeltaTimeUs += task->taskLatestDeltaTimeUs - checkFuncMovingSumDeltaTimeUs / TASK_STATS_MOVING_SUM_COUNT;
                         checkFuncTotalExecutionTimeUs += checkFuncExecutionTimeUs;   // time consumed by scheduler + task
