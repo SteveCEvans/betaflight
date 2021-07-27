@@ -79,6 +79,13 @@ typedef enum {
     GYRO_RATE_32_kHz,
 } gyroRateKHz_e;
 
+typedef enum {
+    INIT = 0,
+    EXTI_INT_DMA,
+    EXTI_INT,
+    NO_EXTI_INT
+} gyroModeSPI_e;
+
 typedef struct gyroDev_s {
 #if defined(SIMULATOR_BUILD) && defined(SIMULATOR_MULTITHREAD)
     pthread_mutex_t lock;
@@ -97,12 +104,7 @@ typedef struct gyroDev_s {
     mpuDetectionResult_t mpuDetectionResult;
     sensor_align_e gyroAlign;
     gyroRateKHz_e gyroRateKHz;
-    enum {
-        INIT = 0,
-        EXTI_INT_DMA,
-        EXTI_INT,
-        NO_EXTI_INT
-    } gyroModeSPI;
+    gyroModeSPI_e gyroModeSPI;
 #ifdef USE_GYRO_EXTI
     uint32_t detectedEXTI;
     int32_t gyroLastEXTI;
