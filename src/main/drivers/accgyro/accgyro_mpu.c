@@ -122,16 +122,8 @@ busStatus_e mpuIntcallback(uint32_t arg)
         gyro->gyroDmaMaxDuration = gyroDmaDuration;
     }
 
-#ifdef DEBUG_MPU_DATA_READY_INTERRUPT
-    debug[0] = (uint16_t)(gyro->gyroXferDone - gyro->gyroLastXferDone);
-#endif
-
     gyro->dataReady = true;
 
-#ifdef DEBUG_MPU_DATA_READY_INTERRUPT
-    const uint32_t now2Us = micros();
-    debug[1] = (uint16_t)(now2Us - gyro->gyroXferDone);
-#endif
     return BUS_READY;
 }
 
@@ -168,19 +160,8 @@ static void mpuIntExtiHandler(extiCallbackRec_t *cb)
 #else
 static void mpuIntExtiHandler(extiCallbackRec_t *cb)
 {
-#ifdef DEBUG_MPU_DATA_READY_INTERRUPT
-    static uint32_t lastCalledAtUs = 0;
-    const uint32_t nowUs = micros();
-    debug[0] = (uint16_t)(nowUs - lastCalledAtUs);
-    lastCalledAtUs = nowUs;
-#endif
     gyroDev_t *gyro = container_of(cb, gyroDev_t, exti);
     gyro->dataReady = true;
-
-#ifdef DEBUG_MPU_DATA_READY_INTERRUPT
-    const uint32_t now2Us = micros();
-    debug[1] = (uint16_t)(now2Us - nowUs);
-#endif
 }
 #endif
 
