@@ -245,7 +245,7 @@ bool mpuAccReadSPI(accDev_t *acc)
         spiWait(&acc->gyro->dev);
 
         // Fall through
-        __attribute__((fallthrough));
+        FALLTHROUGH;
     }
 
     case EXTI_INT_DMA:
