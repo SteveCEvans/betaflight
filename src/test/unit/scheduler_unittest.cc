@@ -19,6 +19,7 @@
 
 extern "C" {
     #include "platform.h"
+    #include "build/debug.h"
     #include "scheduler/scheduler.h"
 }
 
@@ -52,6 +53,9 @@ extern "C" {
     bool taskFilterReady = false;
     bool taskPidReady = false;
     uint8_t activePidLoopDenom = 1;
+
+    uint8_t debugMode = 0;
+    int16_t debug[DEBUG16_VALUE_COUNT];
 
     // set up micros() to simulate time
     uint32_t simulatedTime = 0;
