@@ -75,4 +75,6 @@
 
 #define USE_EXTI
 
+#define USE_DSHOT_DECODE_BITBAND
+
 #define FLASH_PAGE_SIZE                 ((uint32_t)0x4000) // 16K sectors

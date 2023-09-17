@@ -110,7 +110,7 @@ static uint32_t decode_bb_value(uint32_t value, uint16_t buffer[], uint32_t coun
     return value;
 }
 
-#if defined(STM32F4) || defined(AT32F4)
+#if defined(USE_DSHOT_DECODE_BITBAND)
 uint32_t decode_bb_bitband( uint16_t buffer[], uint32_t count, uint32_t bit)
 {
     timeUs_t now = micros();
@@ -262,7 +262,7 @@ uint32_t decode_bb_bitband( uint16_t buffer[], uint32_t count, uint32_t bit)
     return decode_bb_value(value, buffer, count, bit);
 }
 
-#else // defined(STM32F4) || defined(AT32F4)
+#else // defined(USE_DSHOT_DECODE_BITBAND)
 
 FAST_CODE uint32_t decode_bb( uint16_t buffer[], uint32_t count, uint32_t bit)
 {
@@ -392,6 +392,6 @@ FAST_CODE uint32_t decode_bb( uint16_t buffer[], uint32_t count, uint32_t bit)
 
     return decode_bb_value(value, buffer, count, bit);
 }
-#endif // defined(STM32F4) || defined(AT32F4)
+#endif // defined(USE_DSHOT_DECODE_BITBAND)
 
 #endif
