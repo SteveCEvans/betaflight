@@ -93,4 +93,7 @@ void pgResetFn_serialUartConfig(serialUartConfig_t *config)
         config[device].rxDmaopt = uartDmaopt[i].rxDmaopt;
     }
 }
+
+PG_REGISTER(uartTxHoldoffConfig_t, uartTxHoldoffConfig, PG_UART_TX_HOLDOFF_CONFIG, 0);
+
 #endif

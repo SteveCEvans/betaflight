@@ -42,6 +42,7 @@
 #include "drivers/serial.h"
 #include "drivers/serial_uart.h"
 #include "drivers/serial_uart_impl.h"
+#include "drivers/time.h"
 
 #include "pg/serial_uart.h"
 
@@ -265,7 +266,25 @@ static uint8_t uartRead(serialPort_t *instance)
 
 static void uartWrite(serialPort_t *instance, uint8_t ch)
 {
+    static bool uartTxHoldoffInit = true;
+    static timeUs_t uartTxHoldoff;
     uartPort_t *uartPort = (uartPort_t *)instance;
+
+    if (uartTxHoldoffInit) {
+        uartTxHoldoff = uartTxHoldoffConfig()->holdoff * 100000;
+        uartTxHoldoffInit = false;
+    }
+    if (uartTxHoldoff) {
+        if (cmpTimeUs(micros(), uartTxHoldoff) < 0) {
+            if (uartTxHoldoffConfig()->holdoffMask & (1 << instance->identifier)) {
+                // Silently drop the transmitted characters
+                return;
+            }
+        } else {
+            // Holdoff has completed, so disable
+            uartTxHoldoff = 0;
+        }
+    }
 
     // Check if the TX line is being pulled low by an unpowered peripheral
     if (uartPort->checkUsartTxOutput && !uartPort->checkUsartTxOutput(uartPort)) {
