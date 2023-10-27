@@ -32,6 +32,7 @@
 #include "common/utils.h"
 #include "common/crc.h"
 
+#include "drivers/pinio.h"
 #include "drivers/system.h"
 
 #include "io/displayport_msp.h"
@@ -41,6 +42,8 @@
 #include "msp_serial.h"
 
 #include "pg/msp.h"
+
+#include "sensors/gyro.h"
 
 static mspPort_t mspPorts[MAX_MSP_PORT_COUNT];
 
@@ -70,7 +73,7 @@ void mspSerialAllocatePorts(void)
         if (mspConfig()->halfDuplex) {
             options |= SERIAL_BIDIR;
         } else if ((portConfig->identifier >= SERIAL_PORT_USART1) && (portConfig->identifier <= SERIAL_PORT_USART_MAX)){
-            options |= SERIAL_CHECK_TX;
+//            options |= SERIAL_CHECK_TX;
         }
 
         serialPort_t *serialPort = openSerialPort(portConfig->identifier, FUNCTION_MSP, NULL, NULL, baudRates[portConfig->msp_baudrateIndex], MODE_RXTX, options);
@@ -512,6 +515,43 @@ static void mspSerialProcessReceivedReply(mspPort_t *msp, mspProcessReplyFnPtr m
  */
 void mspSerialProcess(mspEvaluateNonMspData_e evaluateNonMspData, mspProcessCommandFnPtr mspProcessCommandFn, mspProcessReplyFnPtr mspProcessReplyFn)
 {
+    uint32_t cycleCount = gyroCycleCount();
+
+    pinioSet(0, 1);
+    for (uint8_t mspPubInst = 0; mspPubInst < MSP_PUB_COUNT; mspPubInst++) {
+        if (mspConfig()->mspPubCmd[mspPubInst]) {
+            static uint32_t nextPubCycleCount[MSP_PUB_COUNT];
+
+            if ((int32_t)(cycleCount - nextPubCycleCount[mspPubInst]) >= 0) {
+                if (mspConfig()->mspPubCmd[mspPubInst] == 102) {
+                    pinioSet(1, 1);
+                    pinioSet(1, 0);
+                }
+
+                // Publication is due
+                for (uint8_t portIndex = 0; portIndex < MAX_MSP_PORT_COUNT; portIndex++) {
+                    mspPort_t * const mspPort = &mspPorts[portIndex];
+                    if (!mspPort->port) {
+                        continue;
+                    }
+
+                    if (mspConfig()->mspPubPortMask[mspPubInst] & (1 << mspPort->port->identifier)) {
+                        mspPort->cmdMSP = mspConfig()->mspPubCmd[mspPubInst];
+                        mspPort->cmdFlags = 0;
+                        mspSerialProcessReceivedCommand(mspPort, mspProcessCommandFn);
+                    }
+                }
+
+                // Set the next publication time
+                nextPubCycleCount[mspPubInst] += mspConfig()->mspPubCycles[mspPubInst];
+
+                // Only send data for one subscription per loop
+                break;
+            }
+        }
+    }
+    pinioSet(0, 0);
+
     for (uint8_t portIndex = 0; portIndex < MAX_MSP_PORT_COUNT; portIndex++) {
         mspPort_t * const mspPort = &mspPorts[portIndex];
         if (!mspPort->port) {

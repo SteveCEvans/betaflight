@@ -220,3 +220,4 @@ void dynLpfGyroUpdate(float throttle);
 #ifdef USE_YAW_SPIN_RECOVERY
 void initYawSpinRecovery(int maxYawRate);
 #endif
+uint32_t gyroCycleCount(void);

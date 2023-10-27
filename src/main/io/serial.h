@@ -142,7 +142,7 @@ typedef struct serialPortConfig_s {
 
 typedef struct serialConfig_s {
     serialPortConfig_t portConfigs[SERIAL_PORT_COUNT];
-    uint16_t serial_update_rate_hz;
+    uint8_t serial_update_rate_cycles;
     uint8_t reboot_character;               // which byte is used to reboot. Default 'R', could be changed carefully to something else.
 } serialConfig_t;
 

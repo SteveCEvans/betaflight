@@ -1001,7 +1001,7 @@ const clivalue_t valueTable[] = {
 
 // PG_SERIAL_CONFIG
     { "reboot_character",           VAR_UINT8  | MASTER_VALUE, .config.minmaxUnsigned = { 48, 126 }, PG_SERIAL_CONFIG, offsetof(serialConfig_t, reboot_character) },
-    { "serial_update_rate_hz",      VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 100, 2000 }, PG_SERIAL_CONFIG, offsetof(serialConfig_t, serial_update_rate_hz) },
+    { "serial_update_rate_cycles",  VAR_UINT8 | MASTER_VALUE, .config.minmaxUnsigned = { 8, 80 }, PG_SERIAL_CONFIG, offsetof(serialConfig_t, serial_update_rate_cycles) },
 
 // PG_IMU_CONFIG
     { PARAM_NAME_IMU_DCM_KP,          VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 0, 32000 }, PG_IMU_CONFIG, offsetof(imuConfig_t, imu_dcm_kp) },
@@ -1715,6 +1715,11 @@ const clivalue_t valueTable[] = {
 
     { "serialmsp_halfduplex", VAR_UINT8  | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_OFF_ON }, PG_MSP_CONFIG, offsetof(mspConfig_t, halfDuplex) },
 
+    // MSP periodic publication
+    { "serialmsp_pub_cmd", VAR_UINT8 | MASTER_VALUE | MODE_ARRAY, .config.array.length = MSP_PUB_COUNT, PG_MSP_CONFIG, offsetof(mspConfig_t, mspPubCmd) },
+    { "serialmsp_pub_mask", VAR_UINT16 | MASTER_VALUE | MODE_ARRAY, .config.array.length = MSP_PUB_COUNT, PG_MSP_CONFIG, offsetof(mspConfig_t, mspPubPortMask) },
+    { "serialmsp_pub_cycles", VAR_UINT16 | MASTER_VALUE | MODE_ARRAY, .config.array.length = MSP_PUB_COUNT, PG_MSP_CONFIG, offsetof(mspConfig_t, mspPubCycles) },
+
 // PG_TIMECONFIG
 #ifdef USE_RTC_TIME
     { "timezone_offset_minutes",  VAR_INT16 | MASTER_VALUE, .config.minmax = { TIMEZONE_OFFSET_MINUTES_MIN, TIMEZONE_OFFSET_MINUTES_MAX }, PG_TIME_CONFIG, offsetof(timeConfig_t, tz_offsetMinutes) },
@@ -1768,8 +1773,7 @@ const clivalue_t valueTable[] = {
 
     // Serial holdoff to inhibit serial output on startup
     { "uart_tx_holdoff_time", VAR_UINT8 | MASTER_VALUE, .config.minmaxUnsigned = { 0, 100 }, PG_UART_TX_HOLDOFF_CONFIG, offsetof(uartTxHoldoffConfig_t, holdoff) },
-    { "uart_tx_holdoff_mask", VAR_UINT32 | MASTER_VALUE, .config.u32Max = UINT32_MAX, PG_UART_TX_HOLDOFF_CONFIG, offsetof(uartTxHoldoffConfig_t, holdoffMask) },
-
+    { "uart_tx_holdoff_mask", VAR_UINT16 | MASTER_VALUE, .config.u32Max = UINT16_MAX, PG_UART_TX_HOLDOFF_CONFIG, offsetof(uartTxHoldoffConfig_t, holdoffMask) },
 };
 
 const uint16_t valueTableEntryCount = ARRAYLEN(valueTable);

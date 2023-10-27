@@ -25,4 +25,4 @@
 
 #include "msp.h"
 
-PG_REGISTER(mspConfig_t, mspConfig, PG_MSP_CONFIG, 0);
+PG_REGISTER(mspConfig_t, mspConfig, PG_MSP_CONFIG, 1);

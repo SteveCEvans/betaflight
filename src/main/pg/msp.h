@@ -22,10 +22,16 @@
 
 #include "drivers/io_types.h"
 
+#include "common/time.h"
 #include "pg/pg.h"
+
+#define MSP_PUB_COUNT   8
 
 typedef struct mspConfig_s {
     uint8_t halfDuplex; // allow msp to operate in half duplex mode
+    uint8_t mspPubCmd[MSP_PUB_COUNT];
+    uint16_t mspPubPortMask[MSP_PUB_COUNT];
+    uint16_t mspPubCycles[MSP_PUB_COUNT];
 } mspConfig_t;
 
 PG_DECLARE(mspConfig_t, mspConfig);

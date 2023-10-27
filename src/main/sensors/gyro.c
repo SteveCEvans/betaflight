@@ -80,6 +80,7 @@ static FAST_DATA_ZERO_INIT timeUs_t yawSpinTimeUs;
 static FAST_DATA_ZERO_INIT float gyroFilteredDownsampled[XYZ_AXIS_COUNT];
 
 static FAST_DATA_ZERO_INIT int16_t gyroSensorTemperature;
+static FAST_DATA_ZERO_INIT int32_t gyroCycleCounter;
 
 FAST_DATA uint8_t activePidLoopDenom = 1;
 
@@ -453,6 +454,13 @@ FAST_CODE void gyroUpdate(void)
         gyro.sampleSum[Z] += gyro.gyroADC[Z];
         gyro.sampleCount++;
     }
+
+    gyroCycleCounter++;
+}
+
+uint32_t gyroCycleCount(void)
+{
+    return gyroCycleCounter;
 }
 
 #define GYRO_FILTER_FUNCTION_NAME filterGyro

@@ -40,7 +40,7 @@ PG_DECLARE_ARRAY(serialUartConfig_t, UARTDEV_CONFIG_MAX, serialUartConfig);
 
 typedef struct uartTxHoldoffConfig_s {
     uint8_t holdoff;        // time to holdoff serial port writes in tenths of a second
-    uint32_t holdoffMask;   // Mask of ports to apply holdoff to. eg bit 1 is UART1
+    uint16_t holdoffMask;   // Mask of ports to apply holdoff to. eg bit 1 is UART1
 } uartTxHoldoffConfig_t;
 
 PG_DECLARE(uartTxHoldoffConfig_t, uartTxHoldoffConfig);

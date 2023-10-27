@@ -126,7 +126,7 @@ serialPortConfig_t *serialFindPortConfigurationMutable(serialPortIdentifier_e id
     return NULL;
 }
 
-PG_REGISTER_WITH_RESET_FN(serialConfig_t, serialConfig, PG_SERIAL_CONFIG, 1);
+PG_REGISTER_WITH_RESET_FN(serialConfig_t, serialConfig, PG_SERIAL_CONFIG, 2);
 
 void pgResetFn_serialConfig(serialConfig_t *serialConfig)
 {
@@ -215,7 +215,7 @@ void pgResetFn_serialConfig(serialConfig_t *serialConfig)
 #endif
 
     serialConfig->reboot_character = 'R';
-    serialConfig->serial_update_rate_hz = 100;
+    serialConfig->serial_update_rate_cycles = 40;
 }
 
 baudRate_e lookupBaudRateIndex(uint32_t baudRate)
