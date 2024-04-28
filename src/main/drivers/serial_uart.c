@@ -266,11 +266,11 @@ static uint8_t uartRead(serialPort_t *instance)
     return ch;
 }
 
-static void uartWrite(serialPort_t *instance, uint8_t ch)
+static bool uartHoldoff(serialPort_t *instance)
 {
+
     static bool uartTxHoldoffInit = true;
     static timeUs_t uartTxHoldoff;
-    uartPort_t *uartPort = (uartPort_t *)instance;
 
     if (uartTxHoldoffInit) {
         uartTxHoldoff = uartTxHoldoffConfig()->holdoff * 100000;
@@ -280,12 +280,24 @@ static void uartWrite(serialPort_t *instance, uint8_t ch)
         if (cmpTimeUs(micros(), uartTxHoldoff) < 0) {
             if (uartTxHoldoffConfig()->holdoffMask & (1 << instance->identifier)) {
                 // Silently drop the transmitted characters
-                return;
+                return true;
             }
         } else {
             // Holdoff has completed, so disable
             uartTxHoldoff = 0;
         }
+    }
+
+    return false;
+}
+
+static void uartWrite(serialPort_t *instance, uint8_t ch)
+{
+    uartPort_t *uartPort = (uartPort_t *)instance;
+
+    if (uartHoldoff(instance)) {
+        // Don't transmit as in startup holdoff period
+        return;
     }
 
     // Check if the TX line is being pulled low by an unpowered peripheral
@@ -334,6 +346,11 @@ static void uartWriteBuf(serialPort_t *instance, const void *data, int count)
     uartDevice_t *uart = container_of(uartPort, uartDevice_t, port);
     const uint8_t *bytePtr = (const uint8_t*)data;
 
+    if (uartHoldoff(instance)) {
+        // Don't transmit as in startup holdoff period
+        return;
+    }
+
     // Test if checkUsartTxOutput() detected TX line being pulled low by an unpowered peripheral
     if (uart->txPinState == TX_PIN_MONITOR) {
         // TX line is being pulled low, so don't transmit
@@ -360,6 +377,11 @@ static void uartEndWrite(serialPort_t *instance)
 {
     uartPort_t *uartPort = (uartPort_t *)instance;
     uartDevice_t *uart = container_of(uartPort, uartDevice_t, port);
+
+    if (uartHoldoff(instance)) {
+        // Don't transmit as in startup holdoff period
+        return;
+    }
 
     // Check if the TX line is being pulled low by an unpowered peripheral
     if (uart->txPinState == TX_PIN_MONITOR) {
