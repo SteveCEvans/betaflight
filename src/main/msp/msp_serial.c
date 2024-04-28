@@ -32,7 +32,6 @@
 #include "common/utils.h"
 #include "common/crc.h"
 
-#include "drivers/pinio.h"
 #include "drivers/system.h"
 
 #include "io/displayport_msp.h"
@@ -513,17 +512,11 @@ void mspSerialProcess(mspEvaluateNonMspData_e evaluateNonMspData, mspProcessComm
 {
     uint32_t cycleCount = gyroCycleCount();
 
-    pinioSet(0, 1);
     for (uint8_t mspPubInst = 0; mspPubInst < MSP_PUB_COUNT; mspPubInst++) {
         if (mspConfig()->mspPubCmd[mspPubInst]) {
             static uint32_t nextPubCycleCount[MSP_PUB_COUNT];
 
             if ((int32_t)(cycleCount - nextPubCycleCount[mspPubInst]) >= 0) {
-                if (mspConfig()->mspPubCmd[mspPubInst] == 102) {
-                    pinioSet(1, 1);
-                    pinioSet(1, 0);
-                }
-
                 // Publication is due
                 for (uint8_t portIndex = 0; portIndex < MAX_MSP_PORT_COUNT; portIndex++) {
                     mspPort_t * const mspPort = &mspPorts[portIndex];
@@ -546,7 +539,6 @@ void mspSerialProcess(mspEvaluateNonMspData_e evaluateNonMspData, mspProcessComm
             }
         }
     }
-    pinioSet(0, 0);
 
     for (uint8_t portIndex = 0; portIndex < MAX_MSP_PORT_COUNT; portIndex++) {
         mspPort_t * const mspPort = &mspPorts[portIndex];
