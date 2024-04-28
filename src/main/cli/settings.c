@@ -1787,7 +1787,7 @@ const clivalue_t valueTable[] = {
 
     // Serial holdoff to inhibit serial output on startup
     { "uart_tx_holdoff_time", VAR_UINT8 | MASTER_VALUE, .config.minmaxUnsigned = { 0, 100 }, PG_UART_TX_HOLDOFF_CONFIG, offsetof(uartTxHoldoffConfig_t, holdoff) },
-    { "uart_tx_holdoff_mask", VAR_UINT16 | MASTER_VALUE, .config.u32Max = UINT16_MAX, PG_UART_TX_HOLDOFF_CONFIG, offsetof(uartTxHoldoffConfig_t, holdoffMask) },
+    { "uart_tx_holdoff_mask", VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 0, UINT16_MAX }, PG_UART_TX_HOLDOFF_CONFIG, offsetof(uartTxHoldoffConfig_t, holdoffMask) },
 };
 
 const uint16_t valueTableEntryCount = ARRAYLEN(valueTable);
