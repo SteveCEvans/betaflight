@@ -173,6 +173,14 @@ typedef enum {
 #define UBLOX_GNSS_ENABLE     0x1
 #define UBLOX_GNSS_DEFAULT_SIGCFGMASK 0x10000
 
+#define UBLOX_GNSS_GPS        0x00
+#define UBLOX_GNSS_SBAS       0x01
+#define UBLOX_GNSS_GALILEO    0x02
+#define UBLOX_GNSS_BEIDOU     0x03
+#define UBLOX_GNSS_IMES       0x04
+#define UBLOX_GNSS_QZSS       0x05
+#define UBLOX_GNSS_GLONASS    0x06
+
 typedef struct ubxHeader_s {
     uint8_t preamble1;
     uint8_t preamble2;
@@ -367,11 +375,6 @@ static void logErrorToPacketLog(void)
 }
 #endif  // USE_DASHBOARD
 
-static bool isConfiguratorConnected(void)
-{
-    return (getArmingDisableFlags() & ARMING_DISABLED_MSP);
-}
-
 static void gpsNewData(uint16_t c);
 #ifdef USE_GPS_NMEA
 static bool gpsNewFrameNMEA(char c);
@@ -395,7 +398,6 @@ void gpsInit(void)
     gpsDataIntervalSeconds = 0.1f;
     gpsData.userBaudRateIndex = 0;
     gpsData.timeouts = 0;
-    gpsData.satMessagesDisabled = false;
     gpsData.state_ts = millis();
 #ifdef USE_GPS_UBLOX
     gpsData.ubloxUsingFlightModel = false;
@@ -939,7 +941,6 @@ static void ubloxSetSbas(void)
 void setSatInfoMessageRate(uint8_t divisor)
 {
     // enable satInfoMessage at 1:5 of the nav rate if configurator is connected
-    divisor = (isConfiguratorConnected()) ? 5 : 0;
     if (gpsData.ubloxM9orAbove) {
          ubloxSetMessageRateValSet(CFG_MSGOUT_UBX_NAV_SAT_UART1, divisor);
     } else if (gpsData.ubloxM8orAbove) {
@@ -1106,16 +1107,11 @@ void gpsConfigureUblox(void)
                 break;
             }
 
-            // allow 3s for the Configurator connection to stabilise, to get the correct answer when we test the state of the connection.
-            // 3s is an arbitrary time at present, maybe should be defined or user adjustable.
-            // This delays the appearance of GPS data in OSD when not connected to configurator by 3s.
-            // Note that state_ts is set to millis() on the previous gpsSetState() command
-            if (!isConfiguratorConnected()) {
-               if (cmp32(gpsData.now, gpsData.state_ts) < 3000) {
-                   return;
-               }
+            // Add delay to stabilize the connection
+            if (cmp32(gpsData.now, gpsData.state_ts) < 1000) {
+                return;
             }
-
+    
             if (gpsData.ackState == UBLOX_ACK_IDLE) {
 
                 // short delay before between commands, including the first command
@@ -2295,38 +2291,27 @@ static bool UBLOX_parse_gps(void)
         break;
     case CLSMSG(CLASS_CFG, MSG_CFG_GNSS):
         {
-            bool isSBASenabled = false;
-            bool isM8NwithDefaultConfig = false;
-
-            if ((ubxRcvMsgPayload.ubxCfgGnss.numConfigBlocks >= 2) &&
-                (ubxRcvMsgPayload.ubxCfgGnss.configblocks[1].gnssId == 1) && //SBAS
-                (ubxRcvMsgPayload.ubxCfgGnss.configblocks[1].flags & UBLOX_GNSS_ENABLE)) { //enabled
-
-                isSBASenabled = true;
-            }
-
-            if ((ubxRcvMsgPayload.ubxCfgGnss.numTrkChHw == 32) &&  //M8N
-                (ubxRcvMsgPayload.ubxCfgGnss.numTrkChUse == 32) &&
-                (ubxRcvMsgPayload.ubxCfgGnss.numConfigBlocks == 7) &&
-                (ubxRcvMsgPayload.ubxCfgGnss.configblocks[2].gnssId == 2) && //Galileo
-                (ubxRcvMsgPayload.ubxCfgGnss.configblocks[2].resTrkCh == 4) && //min channels
-                (ubxRcvMsgPayload.ubxCfgGnss.configblocks[2].maxTrkCh == 8) && //max channels
-                !(ubxRcvMsgPayload.ubxCfgGnss.configblocks[2].flags & UBLOX_GNSS_ENABLE)) { //disabled
-
-                isM8NwithDefaultConfig = true;
-            }
-
             const uint16_t messageSize = 4 + (ubxRcvMsgPayload.ubxCfgGnss.numConfigBlocks * sizeof(ubxConfigblock_t));
-
             ubxMessage_t tx_buffer;
-            memcpy(&tx_buffer.payload, &ubxRcvMsgPayload, messageSize);
 
-            if (isSBASenabled && (gpsConfig()->sbasMode == SBAS_NONE)) {
-                tx_buffer.payload.cfg_gnss.configblocks[1].flags &= ~UBLOX_GNSS_ENABLE; //Disable SBAS
-            }
+            // prevent buffer overflow on invalid numConfigBlocks
+            const int size = MIN(messageSize, sizeof(tx_buffer.payload));
+            memcpy(&tx_buffer.payload, &ubxRcvMsgPayload, size);
 
-            if (isM8NwithDefaultConfig && gpsConfig()->gps_ublox_use_galileo) {
-                tx_buffer.payload.cfg_gnss.configblocks[2].flags |= UBLOX_GNSS_ENABLE; //Enable Galileo
+            for (int i = 0; i < ubxRcvMsgPayload.ubxCfgGnss.numConfigBlocks; i++) {
+                if (ubxRcvMsgPayload.ubxCfgGnss.configblocks[i].gnssId == UBLOX_GNSS_SBAS) {
+                    if (gpsConfig()->sbasMode == SBAS_NONE) {
+                        tx_buffer.payload.cfg_gnss.configblocks[i].flags &= ~UBLOX_GNSS_ENABLE; // Disable SBAS
+                    }
+                }
+
+                if (ubxRcvMsgPayload.ubxCfgGnss.configblocks[i].gnssId == UBLOX_GNSS_GALILEO) {
+                    if (gpsConfig()->gps_ublox_use_galileo) {
+                        tx_buffer.payload.cfg_gnss.configblocks[i].flags |= UBLOX_GNSS_ENABLE; // Enable Galileo
+                    } else {
+                        tx_buffer.payload.cfg_gnss.configblocks[i].flags &= ~UBLOX_GNSS_ENABLE; // Disable Galileo
+                    }
+                }
             }
 
             ubloxSendConfigMessage(&tx_buffer, MSG_CFG_GNSS, messageSize, false);
@@ -2568,6 +2553,13 @@ void GPS_reset_home_position(void)
             // PS: to test for gyro cal, check for !ARMED, since we cannot be here while disarmed other than via gyro cal
         }
     }
+
+#ifdef USE_GPS_UBLOX
+    // disable Sat Info requests on arming
+    if (gpsConfig()->provider == GPS_UBLOX) {
+        setSatInfoMessageRate(0);
+    }
+#endif
     GPS_calculateDistanceFlown(true); // Initialize
 }
 

@@ -54,6 +54,7 @@
 #include "drivers/camera_control_impl.h"
 #include "drivers/compass/compass.h"
 #include "drivers/dma.h"
+#include "drivers/dshot.h"
 #include "drivers/exti.h"
 #include "drivers/flash.h"
 #include "drivers/inverter.h"
@@ -116,7 +117,6 @@
 #include "io/piniobox.h"
 #include "io/rcdevice_cam.h"
 #include "io/serial.h"
-#include "io/servos.h"
 #include "io/transponder_ir.h"
 #include "io/vtx.h"
 #include "io/vtx_control.h"
@@ -694,6 +694,11 @@ void init(void)
     // Now reset the targetLooptime as it's possible for the validation to change the pid_process_denom
     gyroSetTargetLooptime(pidConfig()->pid_process_denom);
 
+#if defined(USE_DSHOT_TELEMETRY) || defined(USE_ESC_SENSOR)
+    // Initialize the motor frequency filter now that we have a target looptime
+    initDshotTelemetry(gyro.targetLooptime);
+#endif
+
     // Finally initialize the gyro filtering
     gyroInitFilters();
 
@@ -886,7 +891,13 @@ void init(void)
     //The OSD need to be initialised after GYRO to avoid GYRO initialisation failure on some targets
 
     if (featureIsEnabled(FEATURE_OSD)) {
-        osdDisplayPortDevice_e device = osdConfig()->displayPortDevice;
+        osdDisplayPortDevice_e device;
+
+        if (vcdProfile()->video_system == VIDEO_SYSTEM_HD) {
+            device = OSD_DISPLAYPORT_DEVICE_MSP;
+        } else {
+            device = osdConfig()->displayPortDevice;
+        }
 
         switch(device) {
 

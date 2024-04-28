@@ -18,6 +18,7 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -269,7 +270,7 @@ static void* tcpThread(void* data)
 
     dyad_init();
     dyad_setTickInterval(0.2f);
-    dyad_setUpdateTimeout(0.5f);
+    dyad_setUpdateTimeout(0.01f);
 
     while (workerRunning) {
         dyad_update();
@@ -432,6 +433,11 @@ int32_t clockCyclesToMicros(int32_t clockCycles)
 }
 
 int32_t clockCyclesTo10thMicros(int32_t clockCycles)
+{
+    return clockCycles;
+}
+
+int32_t clockCyclesTo100thMicros(int32_t clockCycles)
 {
     return clockCycles;
 }

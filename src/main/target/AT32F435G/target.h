@@ -20,9 +20,13 @@
 
 #pragma once
 
+#ifndef TARGET_BOARD_IDENTIFIER
 #define TARGET_BOARD_IDENTIFIER "A435"
+#endif
 
+#ifndef USBD_PRODUCT_STRING
 #define USBD_PRODUCT_STRING     "Betaflight AT32F435"
+#endif
 
 #ifndef AT32F435
 #define AT32F435
@@ -74,8 +78,6 @@
 #define USE_PERSISTENT_MSC_RTC
 
 #define USE_ADC
-
-#define USE_PWM_OUTPUT
 
 // Remove these undefines as support is added
 //#undef USE_BEEPER

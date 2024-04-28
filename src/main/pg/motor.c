@@ -44,6 +44,10 @@
 #define DEFAULT_DSHOT_BURST DSHOT_DMAR_OFF
 #endif
 
+#if !defined(DEFAULT_DSHOT_TELEMETRY)
+#define DEFAULT_DSHOT_TELEMETRY DSHOT_TELEMETRY_OFF
+#endif
+
 PG_REGISTER_WITH_RESET_FN(motorConfig_t, motorConfig, PG_MOTOR_CONFIG, 2);
 
 void pgResetFn_motorConfig(motorConfig_t *motorConfig)
@@ -57,6 +61,9 @@ void pgResetFn_motorConfig(motorConfig_t *motorConfig)
     motorConfig->minthrottle = 1070;
     motorConfig->dev.motorPwmRate = BRUSHLESS_MOTORS_PWM_RATE;
 #ifndef USE_DSHOT
+    if (motorConfig->dev.motorPwmProtocol == PWM_TYPE_STANDARD) {
+        motorConfig->dev.useUnsyncedPwm = true;
+    }
     motorConfig->dev.motorPwmProtocol = PWM_TYPE_DISABLED;
 #elif defined(DEFAULT_MOTOR_DSHOT_SPEED)
     motorConfig->dev.motorPwmProtocol = DEFAULT_MOTOR_DSHOT_SPEED;
@@ -105,6 +112,10 @@ void pgResetFn_motorConfig(motorConfig_t *motorConfig)
 
 #ifdef USE_DSHOT_DMAR
     motorConfig->dev.useBurstDshot = DEFAULT_DSHOT_BURST;
+#endif
+
+#ifdef USE_DSHOT_TELEMETRY
+    motorConfig->dev.useDshotTelemetry = DEFAULT_DSHOT_TELEMETRY;
 #endif
 
 #ifdef USE_DSHOT_BITBANG

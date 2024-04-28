@@ -43,6 +43,7 @@
 #include "drivers/compass/compass_ak8963.h"
 #include "drivers/compass/compass_virtual.h"
 #include "drivers/compass/compass_hmc5883l.h"
+#include "drivers/compass/compass_lis2mdl.h"
 #include "drivers/compass/compass_lis3mdl.h"
 #include "drivers/compass/compass_mpu925x_ak8963.h"
 #include "drivers/compass/compass_qmc5883l.h"
@@ -53,6 +54,8 @@
 #include "drivers/time.h"
 
 #include "fc/runtime_config.h"
+
+#include "io/beeper.h"
 
 #include "pg/pg.h"
 #include "pg/pg_ids.h"
@@ -74,21 +77,27 @@
 #define P0 1.0e2f        // value to initialize P(0) = diag([P0, P0, P0, P0]), typically in range: (1, 1000)
 
 #define CALIBRATION_WAIT_US (15 * 1000 * 1000)               // wait for movement to start and trigger the calibration routine in us
-#define GYRO_NORM_SQUARED_MIN sq(DEGREES_TO_RADIANS(450.0f)) // minimal value that has to be reached so that the calibration routine starts in (rad/sec)^2,
+#define GYRO_NORM_SQUARED_MIN sq(DEGREES_TO_RADIANS(350.0f)) // minimal value that has to be reached so that the calibration routine starts in (rad/sec)^2,
                                                              // a relatively high value so that the calibration routine is not triggered too early
 #define CALIBRATION_TIME_US (30 * 1000 * 1000)               // duration of the calibration phase in us
 
-static timeUs_t tCal = 0;
+static timeUs_t magCalEndTime = 0;
 static bool didMovementStart = false;
+static bool magCalProcessActive = false;
 
 static compassBiasEstimator_t compassBiasEstimator;
 
 magDev_t magDev;
 mag_t mag;
 
-PG_REGISTER_WITH_RESET_FN(compassConfig_t, compassConfig, PG_COMPASS_CONFIG, 3);
+PG_REGISTER_WITH_RESET_FN(compassConfig_t, compassConfig, PG_COMPASS_CONFIG, 4);
 
-#define COMPASS_READ_US 500 // Allow 500us for compass data read
+// If the i2c bus is busy, try again in 500us
+#define COMPASS_BUS_BUSY_INTERVAL_US 500
+// If we check for new mag data, and there is none, try again in 1000us
+#define COMPASS_RECHECK_INTERVAL_US 1000
+// default compass read interval, for those with no specified ODR, will be TASK_COMPASS_RATE_HZ 
+static uint32_t compassReadIntervalUs = TASK_PERIOD_HZ(TASK_COMPASS_RATE_HZ);
 
 void pgResetFn_compassConfig(compassConfig_t *compassConfig)
 {
@@ -136,7 +145,6 @@ void pgResetFn_compassConfig(compassConfig_t *compassConfig)
 }
 
 static int16_t magADCRaw[XYZ_AXIS_COUNT];
-static int16_t magADCRawPrevious[XYZ_AXIS_COUNT];
 
 void compassPreInit(void)
 {
@@ -217,6 +225,22 @@ bool compassDetect(magDev_t *magDev, uint8_t *alignment)
             *alignment = MAG_HMC5883_ALIGN;
 #endif
             magHardware = MAG_HMC5883;
+            break;
+        }
+#endif
+        FALLTHROUGH;
+
+    case MAG_LIS2MDL:
+#if defined(USE_MAG_LIS2MDL)
+        if (dev->bus->busType == BUS_TYPE_I2C) {
+            dev->busType_u.i2c.address = compassConfig()->mag_i2c_address;
+        }
+
+        if (lis2mdlDetect(magDev)) {
+#ifdef MAG_LIS3MDL_ALIGN
+            *alignment = MAG_LIS2MDL_ALIGN;
+#endif
+            magHardware = MAG_LIS2MDL;
             break;
         }
 #endif
@@ -366,6 +390,16 @@ bool compassInit(void)
 
     compassBiasEstimatorInit(&compassBiasEstimator, LAMBDA_MIN, P0);
 
+    if (magDev.magOdrHz) {
+        // For Mags that send data at a fixed ODR, we wait some quiet period after a read before checking for new data
+        // allow two re-check intervals, plus a margin for clock variations in mag vs FC
+        uint16_t odrInterval = 1e6 / magDev.magOdrHz;
+        compassReadIntervalUs =  odrInterval - (2 * COMPASS_RECHECK_INTERVAL_US) - (odrInterval / 20);
+    } else {
+        // Mags which have no specified ODR will be pinged at the compass task rate
+        compassReadIntervalUs = TASK_PERIOD_HZ(TASK_COMPASS_RATE_HZ);
+    }
+
     return true;
 }
 
@@ -377,43 +411,48 @@ bool compassIsHealthy(void)
 void compassStartCalibration(void)
 {
     // starting now, the user has CALIBRATION_WAIT_US to start moving the quad and trigger the actual calibration routine
-    tCal = micros() + CALIBRATION_WAIT_US;
-    flightDynamicsTrims_t *magZero = &compassConfigMutable()->magZero;
-    for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-        magZero->raw[axis] = 0;
-    }
+    beeper(BEEPER_ACC_CALIBRATION); // Beep to alert user that calibration request was received
+    magCalProcessActive = true;
+    magCalEndTime = micros() + CALIBRATION_WAIT_US;
     didMovementStart = false;
-
     // reset / update the compass bias estimator for faster convergence
     compassBiasEstimatorUpdate(&compassBiasEstimator, LAMBDA_MIN, P0);
 }
 
 bool compassIsCalibrationComplete(void)
 {
-    return tCal == 0;
+    return !magCalProcessActive;
 }
 
 uint32_t compassUpdate(timeUs_t currentTimeUs)
 {
-    static uint8_t busyCount = 0;
-    uint32_t nextPeriod = COMPASS_READ_US;
+    static timeUs_t previousTaskTimeUs = 0;
+    const timeDelta_t dTaskTimeUs = cmpTimeUs(currentTimeUs, previousTaskTimeUs);
+    previousTaskTimeUs = currentTimeUs;
+    DEBUG_SET(DEBUG_MAG_TASK_RATE, 6, dTaskTimeUs);
 
-    if (busBusy(&magDev.dev, NULL) || !magDev.read(&magDev, magADCRaw)) {
-        // No action was taken as the read has not completed
-        schedulerIgnoreTaskStateTime();
-
-        busyCount++;
-
-        return nextPeriod; // Wait COMPASS_READ_US between states
+    bool checkBusBusy = busBusy(&magDev.dev, NULL);
+    DEBUG_SET(DEBUG_MAG_TASK_RATE, 4, checkBusBusy);
+    if (checkBusBusy) {
+        // No action is taken, as the bus was busy.
+        schedulerIgnoreTaskExecRate();
+        return COMPASS_BUS_BUSY_INTERVAL_US; // come back in 500us, maybe the bus won't be busy then
     }
 
+    bool checkReadState = !magDev.read(&magDev, magADCRaw);
+    DEBUG_SET(DEBUG_MAG_TASK_RATE, 5, checkReadState);
+    if (checkReadState) {
+        // The compass reported no data available to be retrieved; it may use a state engine that has more than one read state
+        schedulerIgnoreTaskExecRate();
+        return COMPASS_RECHECK_INTERVAL_US; // come back in 1ms, maybe data will be available then
+    }
+
+    // if we get here, we have new data to parse
     for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-        if (magADCRaw[axis] != magADCRawPrevious[axis]) {
-            // this test, and the isNewMagADCFlag itself, is only needed if we calculate magYaw in imu.c
-            mag.isNewMagADCFlag = true;
-        }
         mag.magADC[axis] = magADCRaw[axis];
     }
+    // If debug_mode is DEBUG_GPS_RESCUE_HEADING, we should update the magYaw value, after which isNewMagADCFlag will be set false
+    mag.isNewMagADCFlag = true;
 
     if (magDev.magAlignment == ALIGN_CUSTOM) {
         alignSensorViaMatrix(mag.magADC, &magDev.rotationMatrix);
@@ -421,42 +460,56 @@ uint32_t compassUpdate(timeUs_t currentTimeUs)
         alignSensorViaRotation(mag.magADC, magDev.magAlignment);
     }
 
+    // get stored cal/bias values
     flightDynamicsTrims_t *magZero = &compassConfigMutable()->magZero;
 
-    if (tCal != 0) {
-        if (cmpTimeUs(tCal, currentTimeUs) > 0) {
-            LED0_TOGGLE;
-
-            // it is assumed that the user has started to move the quad if squared norm of rotational speed vector is greater than GYRO_NORM_SQUARED_MIN
+    // ** perform calibration, if initiated by switch or Configurator button **
+    if (magCalProcessActive) {
+        if (cmpTimeUs(magCalEndTime, currentTimeUs) > 0) {
+                // compare squared norm of rotation rate to GYRO_NORM_SQUARED_MIN
             float gyroNormSquared = 0.0f;
             for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
                 gyroNormSquared += sq(DEGREES_TO_RADIANS(gyroGetFilteredDownsampled(axis)));
             }
-
-            // check if movement has started
             if (!didMovementStart && gyroNormSquared > GYRO_NORM_SQUARED_MIN) {
+                // movement has started
+                beeper(BEEPER_READY_BEEP); // Beep to alert user to start moving the quad (does this work?)
+                // zero the old cal/bias values
+                for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
+                    magZero->raw[axis] = 0;
+                }
                 didMovementStart = true;
-                // starting now, the user has CALIBRATION_TIME_US to move the quad in a figure of eight in all directions
-                tCal = micros() + CALIBRATION_TIME_US;
+                // the user has CALIBRATION_TIME_US from now to move the quad in all directions
+                magCalEndTime = micros() + CALIBRATION_TIME_US;
             }
-
-            // only start calibration after the user has started to move the quad
+            // start acquiring mag data and computing new cal factors
             if (didMovementStart) {
+                // LED will flash at task rate while calibrating, looks like 'ON' all the time.
+                LED0_ON;
                 compassBiasEstimatorApply(&compassBiasEstimator, mag.magADC);
             }
         } else {
-            tCal = 0;
-            // only copy the estimated bias and save it to the config if the user has actually triggered the calibration routine
-            if (didMovementStart) {
-                for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-                    magZero->raw[axis] = lrintf(compassBiasEstimator.b[axis]);
+            // mag cal process is not complete until the new cal values are saved
+            if (magCalProcessActive) {
+                // if movement started, accept whatever cal/bias values are available at the end of the movement period
+                if (didMovementStart) {
+                    for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
+                        magZero->raw[axis] = lrintf(compassBiasEstimator.b[axis]);
+                    }
+                    beeper(BEEPER_GYRO_CALIBRATED); // re-purpose gyro cal success beep
+                    saveConfigAndNotify();
+                } else {
+                    // there was no movement, and no new calibration values were saved
+                    beeper(BEEPER_ACC_CALIBRATION_FAIL); // calibration fail beep
                 }
-                saveConfigAndNotify();
+                // didMovementStart remains true until next run 
+                // signal that the calibration process is finalised, whether successful or not, by setting end time to zero
+                magCalProcessActive = false;
             }
         }
     }
 
-    // remove bias
+    // remove saved cal/bias; this is zero while calibrating
     for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
         mag.magADC[axis] -= magZero->raw[axis];
     }
@@ -465,22 +518,38 @@ uint32_t compassUpdate(timeUs_t currentTimeUs)
         for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
             // DEBUG 0-2: magADC[X], magADC[Y], magADC[Z]
             DEBUG_SET(DEBUG_MAG_CALIB, axis, lrintf(mag.magADC[axis]));
-            // DEBUG 4-6: estimated magnetometer bias
+            // DEBUG 4-6: estimated magnetometer bias, increases above zero when calibration starts
             DEBUG_SET(DEBUG_MAG_CALIB, axis + 4, lrintf(compassBiasEstimator.b[axis]));
         }
-        // DEBUG 3: norm / length of magADC, ideally the norm stays constant independent of the orientation of the quad
+        // DEBUG 3: absolute vector length of magADC, should stay constant independent of the orientation of the quad
         DEBUG_SET(DEBUG_MAG_CALIB, 3, lrintf(sqrtf(sq(mag.magADC[X]) + sq(mag.magADC[Y]) + sq(mag.magADC[Z]))));
-        // map adaptive forgetting factor lambda from (lambda_min, 1.0f) -> (0, 2000)
-        const float mapLambdaGain = 1.0f / (1.0f - compassBiasEstimator.lambda_min + 1.0e-6f) * 2.0e3f;
-        // DEBUG 7: adaptive forgetting factor lambda, after the transient phase it should converge to 2000
-        DEBUG_SET(DEBUG_MAG_CALIB, 7, lrintf((compassBiasEstimator.lambda - compassBiasEstimator.lambda_min) * mapLambdaGain));
+        // DEBUG 7: adaptive forgetting factor lambda, only while analysing cal data
+        // after the transient phase it should converge to 2000
+        // set dsiplayed lambda to zero unless calibrating, to indicate start and finish in Sensors tab
+        float displayLambdaGain = 0.0f;
+        if (magCalProcessActive && didMovementStart) {
+            // map adaptive forgetting factor lambda from (lambda_min, 1.0f) -> (0, 2000)
+            const float mapLambdaGain = 1.0f / (1.0f - compassBiasEstimator.lambda_min + 1.0e-6f) * 2.0e3f;
+            displayLambdaGain = (compassBiasEstimator.lambda - compassBiasEstimator.lambda_min) * mapLambdaGain;
+        }
+        DEBUG_SET(DEBUG_MAG_CALIB, 7, lrintf(displayLambdaGain));
     }
 
-    nextPeriod = TASK_PERIOD_HZ(TASK_COMPASS_RATE_HZ) - COMPASS_READ_US * busyCount;
+    if (debugMode == DEBUG_MAG_TASK_RATE) {
+        static timeUs_t previousTimeUs = 0;
+        const timeDelta_t dataIntervalUs = cmpTimeUs(currentTimeUs, previousTimeUs); // time since last data received
+        previousTimeUs = currentTimeUs;
+        const uint16_t actualCompassDataRateHz = 1e6 / dataIntervalUs;
+        timeDelta_t executeTimeUs = micros() - currentTimeUs;
+        DEBUG_SET(DEBUG_MAG_TASK_RATE, 0, TASK_COMPASS_RATE_HZ);
+        DEBUG_SET(DEBUG_MAG_TASK_RATE, 1, actualCompassDataRateHz);
+        DEBUG_SET(DEBUG_MAG_TASK_RATE, 2, dataIntervalUs);
+        DEBUG_SET(DEBUG_MAG_TASK_RATE, 3, executeTimeUs); // time in uS to complete the mag task
+    }
 
-    // Reset the busy count
-    busyCount = 0;
-    return nextPeriod;
+    // don't do the next read check until compassReadIntervalUs has expired
+    schedulerIgnoreTaskExecRate();
+    return compassReadIntervalUs;
 }
 
 // initialize the compass bias estimator

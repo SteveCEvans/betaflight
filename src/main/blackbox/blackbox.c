@@ -45,6 +45,8 @@
 #include "config/config.h"
 #include "config/feature.h"
 
+#include "cli/settings.h"
+
 #include "drivers/compass/compass.h"
 #include "drivers/sensor.h"
 #include "drivers/time.h"
@@ -275,7 +277,7 @@ static const blackboxConditionalFieldDefinition_t blackboxGpsGFields[] = {
     {"GPS_numSat",        -1, UNSIGNED, PREDICT(0),          ENCODING(UNSIGNED_VB), CONDITION(ALWAYS)},
     {"GPS_coord",          0, SIGNED,   PREDICT(HOME_COORD), ENCODING(SIGNED_VB),   CONDITION(ALWAYS)},
     {"GPS_coord",          1, SIGNED,   PREDICT(HOME_COORD), ENCODING(SIGNED_VB),   CONDITION(ALWAYS)},
-    {"GPS_altitude",      -1, UNSIGNED, PREDICT(0),          ENCODING(UNSIGNED_VB), CONDITION(ALWAYS)},
+    {"GPS_altitude",      -1, SIGNED,   PREDICT(0),          ENCODING(SIGNED_VB),   CONDITION(ALWAYS)},
     {"GPS_speed",         -1, UNSIGNED, PREDICT(0),          ENCODING(UNSIGNED_VB), CONDITION(ALWAYS)},
     {"GPS_ground_course", -1, UNSIGNED, PREDICT(0),          ENCODING(UNSIGNED_VB), CONDITION(ALWAYS)}
 };
@@ -467,7 +469,7 @@ static bool testBlackboxConditionUncached(FlightLogFieldCondition condition)
     case CONDITION(MOTOR_6_HAS_RPM):
     case CONDITION(MOTOR_7_HAS_RPM):
     case CONDITION(MOTOR_8_HAS_RPM):
-        return (getMotorCount() >= condition - CONDITION(MOTOR_1_HAS_RPM) + 1) && (motorConfig()->dev.useDshotTelemetry) && isFieldEnabled(FIELD_SELECT(RPM));
+        return (getMotorCount() >= condition - CONDITION(MOTOR_1_HAS_RPM) + 1) && useDshotTelemetry && isFieldEnabled(FIELD_SELECT(RPM));
 #endif
 
     case CONDITION(TRICOPTER):
@@ -1108,7 +1110,7 @@ static void writeGPSFrame(timeUs_t currentTimeUs)
     blackboxWriteUnsignedVB(gpsSol.numSat);
     blackboxWriteSignedVB(gpsSol.llh.lat - gpsHistory.GPS_home[GPS_LATITUDE]);
     blackboxWriteSignedVB(gpsSol.llh.lon - gpsHistory.GPS_home[GPS_LONGITUDE]);
-    blackboxWriteUnsignedVB(gpsSol.llh.altCm / 10); // was originally designed to transport meters in int16, but +-3276.7m is a good compromise
+    blackboxWriteSignedVB(gpsSol.llh.altCm / 10);  // log altitude in increments of 0.1m
     blackboxWriteUnsignedVB(gpsSol.groundSpeed);
     blackboxWriteUnsignedVB(gpsSol.groundCourse);
 
@@ -1165,7 +1167,7 @@ static void loadMainState(timeUs_t currentTimeUs)
 
 #ifdef USE_DSHOT_TELEMETRY
     for (int i = 0; i < motorCount; i++) {
-        blackboxCurrent->erpm[i] = getDshotTelemetry(i);
+        blackboxCurrent->erpm[i] = getDshotErpm(i);
     }
 #endif
 
@@ -1381,7 +1383,7 @@ static bool blackboxWriteSysinfo(void)
             } else {
                 xmitState.headerIndex += 2; // Skip the next two vbat fields too
             }
-            );
+        );
 
         BLACKBOX_PRINT_HEADER_LINE("vbatcellvoltage", "%u,%u,%u",           batteryConfig()->vbatmincellvoltage,
                                                                             batteryConfig()->vbatwarningcellvoltage,
@@ -1392,7 +1394,7 @@ static bool blackboxWriteSysinfo(void)
             if (batteryConfig()->currentMeterSource == CURRENT_METER_ADC) {
                 blackboxPrintfHeaderLine("currentSensor", "%d,%d",currentSensorADCConfig()->offset, currentSensorADCConfig()->scale);
             }
-            );
+        );
 
         BLACKBOX_PRINT_HEADER_LINE("looptime", "%d",                        gyro.sampleLooptime);
         BLACKBOX_PRINT_HEADER_LINE("gyro_sync_denom", "%d",                 1);
@@ -1402,6 +1404,14 @@ static bool blackboxWriteSysinfo(void)
         BLACKBOX_PRINT_HEADER_LINE(PARAM_NAME_TPA_MODE, "%d",               currentPidProfile->tpa_mode);
         BLACKBOX_PRINT_HEADER_LINE(PARAM_NAME_TPA_RATE, "%d",               currentPidProfile->tpa_rate);
         BLACKBOX_PRINT_HEADER_LINE(PARAM_NAME_TPA_BREAKPOINT, "%d",         currentPidProfile->tpa_breakpoint);
+        BLACKBOX_PRINT_HEADER_LINE(PARAM_NAME_TPA_LOW_RATE, "%d",           currentPidProfile->tpa_low_rate);
+        BLACKBOX_PRINT_HEADER_LINE(PARAM_NAME_TPA_LOW_BREAKPOINT, "%d",     currentPidProfile->tpa_low_breakpoint);
+        BLACKBOX_PRINT_HEADER_LINE(PARAM_NAME_TPA_LOW_ALWAYS, "%d",         currentPidProfile->tpa_low_always);
+        BLACKBOX_PRINT_HEADER_LINE(PARAM_NAME_MIXER_TYPE, "%s",             lookupTableMixerType[mixerConfig()->mixer_type]);
+        BLACKBOX_PRINT_HEADER_LINE(PARAM_NAME_EZ_LANDING_THRESHOLD, "%d",   currentPidProfile->ez_landing_threshold);
+        BLACKBOX_PRINT_HEADER_LINE(PARAM_NAME_EZ_LANDING_LIMIT, "%d",       currentPidProfile->ez_landing_limit);
+        BLACKBOX_PRINT_HEADER_LINE(PARAM_NAME_EZ_LANDING_SPEED, "%d",       currentPidProfile->ez_landing_speed);
+
         BLACKBOX_PRINT_HEADER_LINE("rc_rates", "%d,%d,%d",                  currentControlRateProfile->rcRates[ROLL],
                                                                             currentControlRateProfile->rcRates[PITCH],
                                                                             currentControlRateProfile->rcRates[YAW]);
@@ -1514,7 +1524,7 @@ static bool blackboxWriteSysinfo(void)
         BLACKBOX_PRINT_HEADER_LINE(PARAM_NAME_DYN_NOTCH_MIN_HZ, "%d",       dynNotchConfig()->dyn_notch_min_hz);
 #endif
 #ifdef USE_DSHOT_TELEMETRY
-        BLACKBOX_PRINT_HEADER_LINE(PARAM_NAME_DSHOT_BIDIR, "%d",            motorConfig()->dev.useDshotTelemetry);
+        BLACKBOX_PRINT_HEADER_LINE(PARAM_NAME_DSHOT_BIDIR, "%d",            useDshotTelemetry);
         BLACKBOX_PRINT_HEADER_LINE(PARAM_NAME_MOTOR_POLES, "%d",            motorConfig()->motorPoleCount);
 #endif
 #ifdef USE_RPM_FILTER
@@ -2056,7 +2066,7 @@ uint16_t blackboxGetPRatio(void)
 
 uint8_t blackboxCalculateSampleRate(uint16_t pRatio)
 {
-    return LOG2(32000 / (targetPidLooptime * pRatio));
+    return llog2(32000 / (targetPidLooptime * pRatio));
 }
 
 /**

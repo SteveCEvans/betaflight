@@ -19,6 +19,7 @@ COMMON_SRC = \
             drivers/bus.c \
             drivers/bus_i2c_config.c \
             drivers/bus_i2c_busdev.c \
+            drivers/bus_i2c_utils.c \
             drivers/bus_i2c_soft.c \
             drivers/bus_octospi.c \
             drivers/bus_quadspi.c \
@@ -64,6 +65,7 @@ COMMON_SRC = \
             io/usb_msc.c \
             msp/msp.c \
             msp/msp_box.c \
+            msp/msp_build_info.c \
             msp/msp_serial.c \
             scheduler/scheduler.c \
             sensors/adcinternal.c \
@@ -368,6 +370,7 @@ SIZE_OPTIMISED_SRC := $(SIZE_OPTIMISED_SRC) \
             drivers/compass/compass_fake.c \
             drivers/compass/compass_hmc5883l.c \
             drivers/compass/compass_qmc5883l.c \
+            drivers/compass/compass_lis2mdl.c \
             drivers/compass/compass_lis3mdl.c \
             drivers/compass/compass_ist8310.c \
             drivers/display_ug2864hsweg01.c \

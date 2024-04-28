@@ -90,12 +90,8 @@ pt1Filter_t throttleLpf;
 
 PG_REGISTER_WITH_RESET_TEMPLATE(pidConfig_t, pidConfig, PG_PID_CONFIG, 3);
 
-#if !defined(DEFAULT_PID_PROCESS_DENOM)
-#if defined(STM32F411xE)
-#define DEFAULT_PID_PROCESS_DENOM       2
-#else
+#ifndef DEFAULT_PID_PROCESS_DENOM
 #define DEFAULT_PID_PROCESS_DENOM       1
-#endif
 #endif
 
 #ifdef USE_RUNAWAY_TAKEOFF
@@ -120,7 +116,7 @@ PG_RESET_TEMPLATE(pidConfig_t, pidConfig,
 
 #define LAUNCH_CONTROL_YAW_ITERM_LIMIT 50 // yaw iterm windup limit when launch mode is "FULL" (all axes)
 
-PG_REGISTER_ARRAY_WITH_RESET_FN(pidProfile_t, PID_PROFILE_COUNT, pidProfiles, PG_PID_PROFILE, 7);
+PG_REGISTER_ARRAY_WITH_RESET_FN(pidProfile_t, PID_PROFILE_COUNT, pidProfiles, PG_PID_PROFILE, 8);
 
 void resetPidProfile(pidProfile_t *pidProfile)
 {
@@ -228,6 +224,12 @@ void resetPidProfile(pidProfile_t *pidProfile)
         .angle_feedforward_smoothing_ms = 80,
         .angle_earth_ref = 100,
         .horizon_delay_ms = 500, // 500ms time constant on any increase in horizon strength
+        .tpa_low_rate = 20,
+        .tpa_low_breakpoint = 1050,
+        .tpa_low_always = 0,
+        .ez_landing_threshold = 25,
+        .ez_landing_limit = 15,
+        .ez_landing_speed = 50,
     );
 
 #ifndef USE_D_MIN
@@ -277,9 +279,20 @@ void pidResetIterm(void)
 
 void pidUpdateTpaFactor(float throttle)
 {
-    const float throttleTemp = fminf(throttle, 1.0f); // don't permit throttle > 1 ? is this needed ? can throttle be > 1 at this point ?
-    const float throttleDifference = fmaxf(throttleTemp - pidRuntime.tpaBreakpoint, 0.0f);
-    pidRuntime.tpaFactor = 1.0f - throttleDifference * pidRuntime.tpaMultiplier;
+    static bool isTpaLowFaded = false;
+    // don't permit throttle > 1 & throttle < 0 ? is this needed ? can throttle be > 1 or < 0 at this point
+    throttle = constrainf(throttle, 0.0f, 1.0f);
+    bool isThrottlePastTpaLowBreakpoint = (throttle < pidRuntime.tpaLowBreakpoint && pidRuntime.tpaLowBreakpoint > 0.01f) ? false : true;
+    float tpaRate = 0.0f;
+    if (isThrottlePastTpaLowBreakpoint || isTpaLowFaded) {
+        tpaRate = pidRuntime.tpaMultiplier * fmaxf(throttle - pidRuntime.tpaBreakpoint, 0.0f);
+        if (!pidRuntime.tpaLowAlways && !isTpaLowFaded) {
+            isTpaLowFaded = true;
+        }
+    } else {
+        tpaRate = pidRuntime.tpaLowMultiplier * (pidRuntime.tpaLowBreakpoint - throttle);
+    }
+    pidRuntime.tpaFactor = 1.0f - tpaRate;
 }
 
 void pidUpdateAntiGravityThrottleFilter(float throttle)

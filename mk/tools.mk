@@ -31,7 +31,7 @@ arm_sdk_version:
 ARM_SDK_URL_BASE  := https://developer.arm.com/-/media/Files/downloads/gnu-rm/10.3-2021.10/gcc-arm-none-eabi-10.3-2021.10
 # source: https://developer.arm.com/open-source/gnu-toolchain/gnu-rm/downloads
 ifeq ($(OSFAMILY), linux)
-  ARM_SDK_URL  := $(ARM_SDK_URL_BASE)-x86_64-linux.tar.bz2
+  ARM_SDK_URL  := $(ARM_SDK_URL_BASE)-$(shell uname -m)-linux.tar.bz2
 endif
 
 ifeq ($(OSFAMILY), macosx)
@@ -268,7 +268,7 @@ else ifeq (,$(filter %_install test% clean% %-print checks help configs, $(MAKEC
     $(error **ERROR** your arm-none-eabi-gcc is '$(GCC_VERSION)', but '$(GCC_REQUIRED_VERSION)' is expected. Override with 'GCC_REQUIRED_VERSION' in mk/local.mk or run 'make arm_sdk_install' to install the right version automatically in the tools folder of this repo)
   endif
 
-  # ARM tookchain is in the path, and the version is what's required.
+  # ARM toolchain is in the path, and the version is what's required.
   ARM_SDK_PREFIX ?= arm-none-eabi-
 endif
 

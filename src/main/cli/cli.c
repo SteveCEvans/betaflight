@@ -280,7 +280,10 @@ static const char *mcuTypeNames[] = {
     "AT32F435"
 };
 
-static const char *configurationStates[] = { "UNCONFIGURED", "CUSTOM DEFAULTS", "CONFIGURED" };
+static const char *configurationStates[] = {
+    [CONFIGURATION_STATE_UNCONFIGURED] = "UNCONFIGURED",
+    [CONFIGURATION_STATE_CONFIGURED] = "CONFIGURED"
+};
 
 typedef enum dumpFlags_e {
     DUMP_MASTER = (1 << 0),
@@ -2175,8 +2178,8 @@ static void cliServo(const char *cmdName, char *cmdline)
         servo = servoParamsMutable(i);
 
         if (
-            arguments[MIN] < PWM_PULSE_MIN || arguments[MIN] > PWM_PULSE_MAX ||
-            arguments[MAX] < PWM_PULSE_MIN || arguments[MAX] > PWM_PULSE_MAX ||
+            arguments[MIN] < PWM_SERVO_MIN || arguments[MIN] > PWM_SERVO_MAX ||
+            arguments[MAX] < PWM_SERVO_MIN || arguments[MAX] > PWM_SERVO_MAX ||
             arguments[MIDDLE] < arguments[MIN] || arguments[MIDDLE] > arguments[MAX] ||
             arguments[MIN] > arguments[MAX] ||
             arguments[RATE] < -100 || arguments[RATE] > 100 ||
@@ -4247,7 +4250,6 @@ static void cliDefaults(const char *cmdName, char *cmdline)
 
     char *saveptr;
     char* tok = strtok_r(cmdline, " ", &saveptr);
-    int index = 0;
     bool expectParameterGroupId = false;
     while (tok != NULL) {
         if (expectParameterGroupId) {
@@ -4268,7 +4270,6 @@ static void cliDefaults(const char *cmdName, char *cmdline)
             return;
         }
 
-        index++;
         tok = strtok_r(NULL, " ", &saveptr);
     }
 
@@ -4383,13 +4384,13 @@ static uint8_t getWordLength(char *bufBegin, char *bufEnd)
     return bufEnd - bufBegin;
 }
 
-uint16_t cliGetSettingIndex(char *name, uint8_t length)
+uint16_t cliGetSettingIndex(const char *name, size_t length)
 {
     for (uint32_t i = 0; i < valueTableEntryCount; i++) {
         const char *settingName = valueTable[i].name;
 
-        // ensure exact match when setting to prevent setting variables with shorter names
-        if (strncasecmp(name, settingName, strlen(settingName)) == 0 && length == strlen(settingName)) {
+        // ensure exact match when setting to prevent setting variables with longer names
+        if (strncasecmp(name, settingName, length) == 0 && length == strlen(settingName)) {
             return i;
         }
     }
@@ -4579,7 +4580,7 @@ STATIC_UNIT_TESTED void cliSet(const char *cmdName, char *cmdline)
                 if (updatable && len > 0 && len <= max) {
                     memset((char *)cliGetValuePointer(val), 0, max);
                     if (len >= min && strncmp(valPtr, emptyName, len)) {
-                        strncpy((char *)cliGetValuePointer(val), valPtr, len);
+                        memcpy((char *)cliGetValuePointer(val), valPtr, len);
                     }
                     valueChanged = true;
                 } else {
@@ -4817,12 +4818,7 @@ if (buildKey) {
                 cliPrint("configured");
             }
         }
-        if (gpsData.platformVersion != UBX_VERSION_UNDEF) {
-            cliPrint(", version = ");
-            cliPrintf("%s", ubloxVersionMap[gpsData.platformVersion].str);
-        } else {
-            cliPrint("unknown");
-        }
+        cliPrintf(", version =  %s", gpsData.platformVersion != UBX_VERSION_UNDEF ? ubloxVersionMap[gpsData.platformVersion].str : "unknown");
     } else {
         cliPrint("NOT ENABLED");
     }
@@ -5027,15 +5023,19 @@ const cliResourceValue_t resourceTable[] = {
     DEFS( OWNER_LED_STRIP,     PG_LED_STRIP_CONFIG, ledStripConfig_t, ioTag ),
 #endif
 #ifdef USE_UART
-    DEFA( OWNER_SERIAL_TX,     PG_SERIAL_PIN_CONFIG, serialPinConfig_t, ioTagTx[0], SERIAL_PORT_MAX_INDEX ),
-    DEFA( OWNER_SERIAL_RX,     PG_SERIAL_PIN_CONFIG, serialPinConfig_t, ioTagRx[0], SERIAL_PORT_MAX_INDEX ),
+    DEFA( OWNER_SERIAL_TX,     PG_SERIAL_PIN_CONFIG, serialPinConfig_t, ioTagTx[0], SERIAL_UART_COUNT ),
+    DEFA( OWNER_SERIAL_RX,     PG_SERIAL_PIN_CONFIG, serialPinConfig_t, ioTagRx[0], SERIAL_UART_COUNT ),
 #endif
 #ifdef USE_INVERTER
     DEFA( OWNER_INVERTER,      PG_SERIAL_PIN_CONFIG, serialPinConfig_t, ioTagInverter[0], SERIAL_PORT_MAX_INDEX ),
 #endif
 #if defined(USE_SOFTSERIAL)
-    DEFA( OWNER_SOFTSERIAL_TX,     PG_SOFTSERIAL_PIN_CONFIG, softSerialPinConfig_t, ioTagTx[0], SOFTSERIAL_COUNT ),
-    DEFA( OWNER_SOFTSERIAL_RX,     PG_SOFTSERIAL_PIN_CONFIG, softSerialPinConfig_t, ioTagRx[0], SOFTSERIAL_COUNT ),
+    DEFA( OWNER_SOFTSERIAL_TX, PG_SOFTSERIAL_PIN_CONFIG, softSerialPinConfig_t, ioTagTx[0], SOFTSERIAL_COUNT ),
+    DEFA( OWNER_SOFTSERIAL_RX, PG_SOFTSERIAL_PIN_CONFIG, softSerialPinConfig_t, ioTagRx[0], SOFTSERIAL_COUNT ),
+#endif
+#ifdef USE_LPUART1
+    DEFA( OWNER_LPUART_TX,     PG_SERIAL_PIN_CONFIG, serialPinConfig_t, ioTagTx[SERIAL_UART_COUNT], SERIAL_LPUART_COUNT ),
+    DEFA( OWNER_LPUART_RX,     PG_SERIAL_PIN_CONFIG, serialPinConfig_t, ioTagRx[SERIAL_UART_COUNT], SERIAL_LPUART_COUNT ),
 #endif
 #ifdef USE_I2C
     DEFW( OWNER_I2C_SCL,       PG_I2C_CONFIG, i2cConfig_t, ioTagScl, I2CDEV_COUNT ),
@@ -5051,8 +5051,8 @@ const cliResourceValue_t resourceTable[] = {
 #endif
 #ifdef USE_SPI
     DEFW( OWNER_SPI_SCK,       PG_SPI_PIN_CONFIG, spiPinConfig_t, ioTagSck, SPIDEV_COUNT ),
-    DEFW( OWNER_SPI_SDI,      PG_SPI_PIN_CONFIG, spiPinConfig_t, ioTagMiso, SPIDEV_COUNT ),
-    DEFW( OWNER_SPI_SDO,      PG_SPI_PIN_CONFIG, spiPinConfig_t, ioTagMosi, SPIDEV_COUNT ),
+    DEFW( OWNER_SPI_SDI,       PG_SPI_PIN_CONFIG, spiPinConfig_t, ioTagMiso, SPIDEV_COUNT ),
+    DEFW( OWNER_SPI_SDO,       PG_SPI_PIN_CONFIG, spiPinConfig_t, ioTagMosi, SPIDEV_COUNT ),
 #endif
 #ifdef USE_ESCSERIAL
     DEFS( OWNER_ESCSERIAL,     PG_ESCSERIAL_CONFIG, escSerialConfig_t, ioTag ),
@@ -5331,7 +5331,7 @@ dmaoptEntry_t dmaoptEntryTable[] = {
 #define DMA_OPT_UI_INDEX(i) ((i) + 1)
 #define DMA_OPT_STRING_BUFSIZE 5
 
-#if defined(STM32H7) || defined(STM32G4)
+#if defined(STM32H7) || defined(STM32G4) || defined(AT32F435)
 #define DMA_CHANREQ_STRING "Request"
 #else
 #define DMA_CHANREQ_STRING "Channel"
@@ -6119,8 +6119,8 @@ static void cliDshotTelemetryInfo(const char *cmdName, char *cmdline)
 #endif
 
         for (uint8_t i = 0; i < getMotorCount(); i++) {
-            const uint16_t erpm = getDshotTelemetry(i);
-            const uint16_t rpm = erpmToRpm(erpm);
+            const uint16_t erpm = getDshotErpm(i);
+            const uint16_t rpm = lrintf(getDshotRpm(i));
 
             cliPrintf("%5d   %c%c%c%c%c %6d %6d %6d",
                     i + 1,
@@ -6465,7 +6465,7 @@ const clicmd_t cmdTable[] = {
         "\t<->[name]", cliBeeper),
 #endif // USE_BEEPER
 #if defined(USE_RX_BIND)
-    CLI_COMMAND_DEF("bind_rx", "initiate binding for RX SPI or SRXL2", NULL, cliRxBind),
+    CLI_COMMAND_DEF("bind_rx", "initiate binding for RX SPI, SRXL2 or CRSF", NULL, cliRxBind),
 #endif
 #if defined(USE_FLASH_BOOT_LOADER)
     CLI_COMMAND_DEF("bl", "reboot into bootloader", "[flash|rom]", cliBootloader),
