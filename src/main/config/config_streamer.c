@@ -230,7 +230,7 @@ static uint32_t getFLASHSectorForEEPROM(void)
     }
 }
 
-#elif defined(STM32H743xx) || defined(STM32G4) || defined(STM32H7A3xx) || defined(STM32H7A3xxQ) || defined(STM32H723xx) || defined(STM32H725xx)
+#elif defined(STM32H743xx) || defined(STM32G4) || defined(STM32H5) || defined(STM32H7A3xx) || defined(STM32H7A3xxQ) || defined(STM32H723xx) || defined(STM32H725xx)
 /*
 MCUs with uniform array of equal size sectors, handled in two banks having contiguous address.
 (Devices with non-contiguous flash layout is not currently useful anyways.)
@@ -244,7 +244,7 @@ H743
 1 bank * 8 sector/bank * 128K/sector (1MB)
 Bank 1 0x08000000 - 0x080FFFFF 128KB * 8
 
-H7A3
+H7A3 and H563
 2 bank * 128 sector/bank * 8KB/sector (2MB)
 Bank 1 0x08000000 - 0x080FFFFF 8KB * 128
 Bank 2 0x08100000 - 0x081FFFFF 8KB * 128
@@ -263,7 +263,7 @@ FLASH_BANK_SIZE constant is set to one half of the available flash size in HAL.
 #define FLASH_PAGE_PER_BANK 8
 #elif defined(STM32H7A3xx) || defined(STM32H7A3xxQ)
 #define FLASH_PAGE_PER_BANK 128
-#elif defined(STM32G4)
+#elif defined(STM32G4) || defined(STM32H5)
 #define FLASH_PAGE_PER_BANK 128
 // These are not defined in CMSIS like H7
 #define FLASH_BANK1_BASE FLASH_BASE
@@ -399,7 +399,7 @@ static int write_word(config_streamer_t *c, config_streamer_buffer_align_type_t 
 
 #elif defined(CONFIG_IN_FLASH)
 
-#if defined(STM32H7) || defined(STM32H5)
+#if defined(STM32H7)
     if (c->address % FLASH_PAGE_SIZE == 0) {
         FLASH_EraseInitTypeDef EraseInitStruct = {
             .TypeErase     = FLASH_TYPEERASE_SECTORS,
@@ -462,6 +462,26 @@ static int write_word(config_streamer_t *c, config_streamer_buffer_align_type_t 
 
     STATIC_ASSERT(CONFIG_STREAMER_BUFFER_SIZE == sizeof(uint32_t) * 2,  "CONFIG_STREAMER_BUFFER_SIZE does not match written size");
     const HAL_StatusTypeDef status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, c->address, (uint64_t)*buffer);
+    if (status != HAL_OK) {
+        return -2;
+    }
+#elif defined(STM32H5)
+    if (c->address % FLASH_PAGE_SIZE == 0) {
+
+        FLASH_EraseInitTypeDef EraseInitStruct = {
+            .TypeErase     = FLASH_TYPEERASE_SECTORS,
+            .NbSectors     = 1
+        };
+        getFLASHSectorForEEPROM(c->address, &EraseInitStruct.Banks, &EraseInitStruct.Sector);
+        uint32_t SECTORError;
+        const HAL_StatusTypeDef status = HAL_FLASHEx_Erase(&EraseInitStruct, &SECTORError);
+        if (status != HAL_OK) {
+            return -1;
+        }
+    }
+
+    STATIC_ASSERT(CONFIG_STREAMER_BUFFER_SIZE == sizeof(uint32_t) * 2,  "CONFIG_STREAMER_BUFFER_SIZE does not match written size");
+    const HAL_StatusTypeDef status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_QUADWORD, c->address, (uint64_t)*buffer);
     if (status != HAL_OK) {
         return -2;
     }

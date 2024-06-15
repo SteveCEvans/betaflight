@@ -62,25 +62,25 @@ void persistentObjectWrite(persistentObjectId_e id, uint32_t value)
 
 void persistentObjectRTCEnable(void)
 {
-#if !defined(STM32G4)
+#if !(defined(STM32G4) || defined(STM32H5))
     // G4 library V1.0.0 __HAL_RTC_WRITEPROTECTION_ENABLE/DISABLE macro does not use handle parameter
     RTC_HandleTypeDef rtcHandle = { .Instance = RTC };
 #endif
 
-#if !defined(STM32H7) && !defined(STM32H5)
+#if !(defined(STM32H7) || defined(STM32H5))
     __HAL_RCC_PWR_CLK_ENABLE(); // Enable Access to PWR
 #endif
 
     HAL_PWR_EnableBkUpAccess(); // Disable backup domain protection
 
-#if defined(STM32G4)
+#if defined(STM32G4) || defined(STM32H5)
     /* Enable RTC APB clock  */
     __HAL_RCC_RTCAPB_CLK_ENABLE();
 
     /* Peripheral clock enable */
     __HAL_RCC_RTC_ENABLE();
 
-#else // !STM32G4, F7 and H7 case
+#else // !STM32G4, !STM32H5, F7 and H7 case
 
 #if defined(__HAL_RCC_RTC_CLK_ENABLE)
     // For those MCUs with RTCAPBEN bit in RCC clock enable register, turn it on.
@@ -130,7 +130,7 @@ void persistentObjectInit(void)
 
     uint32_t wasSoftReset;
 
-#ifdef STM32H7
+#if defined(STM32H7) || defined(STM32H5)
     wasSoftReset = RCC->RSR & RCC_RSR_SFTRSTF;
 #else
     wasSoftReset = RCC->CSR & RCC_CSR_SFTRSTF;

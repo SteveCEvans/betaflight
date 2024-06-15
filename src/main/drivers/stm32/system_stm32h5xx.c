@@ -132,9 +132,6 @@ void systemInit(void)
 
 void systemReset(void)
 {
-    SCB_DisableDCache();
-    SCB_DisableICache();
-
     __disable_irq();
     NVIC_SystemReset();
 }
@@ -166,19 +163,14 @@ void systemResetToBootloader(bootloaderRequestType_e requestType)
 }
 
 
-#if defined(STM32H743xx) || defined(STM32H750xx) || defined(STM32H723xx) || defined(STM32H725xx) || defined(STM32H730xx)
-#define SYSMEMBOOT_VECTOR_TABLE ((uint32_t *)0x1ff09800)
-#elif defined(STM32H7A3xx) || defined(STM32H7A3xxQ)
-#define SYSMEMBOOT_VECTOR_TABLE ((uint32_t *)0x1ff0a000)
-#else
-#error Unknown MCU
-#endif
+#define SYSMEMBOOT_VECTOR_TABLE ((uint32_t *)0x1fff0000)
+#define SYSMEMBOOT_LOADER       ((uint32_t *)0x1fff0000)
 
 typedef void *(*bootJumpPtr)(void);
 
 void systemJumpToBootloader(void)
 {
-    __SYSCFG_CLK_ENABLE();
+//    __SYSCFG_CLK_ENABLE(); TODO Fix
 
     uint32_t bootStack =  SYSMEMBOOT_VECTOR_TABLE[0];
 

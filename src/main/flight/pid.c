@@ -995,6 +995,7 @@ void FAST_CODE pidController(const pidProfile_t *pidProfile, timeUs_t currentTim
         float pidSetpointDelta = 0;
 
 #ifdef USE_FEEDFORWARD
+#ifdef USE_ACC
         if (FLIGHT_MODE(ANGLE_MODE) && pidRuntime.axisInAngleMode[axis]) {
             // this axis is fully under self-levelling control
             // it will already have stick based feedforward applied in the input to their angle setpoint
@@ -1007,7 +1008,9 @@ void FAST_CODE pidController(const pidProfile_t *pidProfile, timeUs_t currentTim
 //            pidSetpointDelta = currentPidSetpoint - pidRuntime.previousPidSetpoint[axis];
 //            pidSetpointDelta *= pidRuntime.pidFrequency * pidRuntime.angleFeedforwardGain;
             pidSetpointDelta = 0.0f;
-        } else {
+        } else
+#endif
+        {
             // the axis is operating as a normal acro axis, so use normal feedforard from rc.c
             pidSetpointDelta = getFeedforward(axis);
         }

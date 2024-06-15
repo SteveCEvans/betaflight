@@ -80,7 +80,7 @@ void memoryMappedModeInit(void);
 bool isMemoryMappedModeEnabledOnBoot(void);
 
 void initialiseMemorySections(void);
-#ifdef STM32H7
+#if defined(STM32H7) || defined(STM32H5)
 void initialiseD2MemorySections(void);
 void systemResetWithoutDisablingCaches(void);
 #endif

@@ -332,6 +332,7 @@
 #endif
 
 #if defined(USE_FLASH_W25N02K) || defined(USE_FLASH_W25N01G)
+#error w25n
 #define USE_FLASH_W25N
 #endif
 
@@ -424,11 +425,11 @@
 
 #ifndef SIMULATOR_BUILD
 #ifndef USE_ACC
-#define USE_ACC
+//#define USE_ACC TODO Fix for H563
 #endif
 
 #ifndef USE_GYRO
-#define USE_GYRO
+//#define USE_GYRO TODO Fix for H563
 #endif
 #endif
 

@@ -40,7 +40,7 @@
 #include "drivers/compass/compass.h"
 #include "drivers/sensor.h"
 #include "drivers/serial.h"
-#include "drivers/serial_usb_vcp.h"
+//#include "drivers/serial_usb_vcp.h" TODO include for H563 once we have a CDC driver
 #include "drivers/stack_check.h"
 #include "drivers/transponder_ir.h"
 #include "drivers/usb_io.h"
