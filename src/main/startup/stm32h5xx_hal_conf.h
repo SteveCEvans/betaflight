@@ -42,7 +42,7 @@ extern "C" {
 //#define HAL_CRC_MODULE_ENABLED
 //#define HAL_CRYP_MODULE_ENABLED
 #define HAL_DAC_MODULE_ENABLED
-//#define HAL_DCACHE_MODULE_ENABLED
+#define HAL_DCACHE_MODULE_ENABLED
 //#define HAL_DCMI_MODULE_ENABLED
 #define HAL_DMA_MODULE_ENABLED
 //#define HAL_DTS_MODULE_ENABLED
@@ -55,11 +55,10 @@ extern "C" {
 //#define HAL_GTZC_MODULE_ENABLED
 //#define HAL_HASH_MODULE_ENABLED
 //#define HAL_HCD_MODULE_ENABLED
-#define HAL_CACHE_ENABLED
 #define HAL_I2C_MODULE_ENABLED
 //#define HAL_I2S_MODULE_ENABLED
 //#define HAL_I3C_MODULE_ENABLED
-//#define HAL_ICACHE_MODULE_ENABLED
+#define HAL_ICACHE_MODULE_ENABLED
 //#define HAL_IRDA_MODULE_ENABLED
 //#define HAL_IWDG_MODULE_ENABLED
 //#define HAL_LPTIM_MODULE_ENABLED
@@ -332,11 +331,6 @@ in voltage and temperature.*/
 #ifdef HAL_NAND_MODULE_ENABLED
 #include "stm32h5xx_hal_nand.h"
 #endif /* HAL_NAND_MODULE_ENABLED */
-
-#ifdef HAL_CACHE_ENABLED
-#include "stm32h5xx_hal_icache.h"
-#include "stm32h5xx_hal_dcache.h"
-#endif /* HAL_CACHE_ENABLED */
 
 #ifdef HAL_I2C_MODULE_ENABLED
 #include "stm32h5xx_hal_i2c.h"

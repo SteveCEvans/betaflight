@@ -530,10 +530,13 @@ void SystemClock_Config(void)
   /* Configure Flash prefetch and wait state */
   FLASH->ACR = FLASH_ACR_PRFTEN | FLASH_ACR_LATENCY_4WS;
 
-#ifdef HAL_CACHE_ENABLED
-  // Enable caches
+#ifdef HAL_ICACHE_MODULE_ENABLED
+  // Enable instruction cache
   HAL_ICACHE_Enable();
+#endif
 
+#ifdef HAL_DCACHE_MODULE_ENABLED
+  // Enable data cache
   DCACHE_HandleTypeDef hdcache;
   hdcache.Instance = DCACHE1;
   hdcache.Init.ReadBurstType = DCACHE_READ_BURST_WRAP;

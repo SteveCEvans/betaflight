@@ -29,7 +29,7 @@
 #include "drivers/system.h"
 
 
-void SystemClock_Config(void);
+extern void SystemClock_Config(void);
 
 void configureMasterClockOutputs(void)
 {

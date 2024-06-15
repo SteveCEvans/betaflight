@@ -59,12 +59,16 @@ _Min_Stack_Size = 0x800; /* required amount of stack */
 SECTIONS
 {
   /* The startup code goes first into FLASH */
+  _isr_vector_table_flash_base = LOADADDR(.isr_vector);
+  PROVIDE (isr_vector_table_flash_base = _isr_vector_table_flash_base);
+
   .isr_vector :
   {
     . = ALIGN(512);
     PROVIDE (isr_vector_table_base = .);
     KEEP(*(.isr_vector)) /* Startup code */
     . = ALIGN(4);
+    PROVIDE (isr_vector_table_end = .);
   } >FLASH
 
   /* The program code and other data goes into FLASH */
