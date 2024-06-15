@@ -46,7 +46,7 @@ typedef struct flashGeometry_s {
     uint16_t pagesPerSector;
     flashType_e flashType;
     uint32_t jedecId;
-} flashSector_t;
+} flashGeometry_t;
 
 
 typedef enum {
