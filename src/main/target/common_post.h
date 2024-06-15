@@ -332,7 +332,6 @@
 #endif
 
 #if defined(USE_FLASH_W25N02K) || defined(USE_FLASH_W25N01G)
-#error w25n
 #define USE_FLASH_W25N
 #endif
 
