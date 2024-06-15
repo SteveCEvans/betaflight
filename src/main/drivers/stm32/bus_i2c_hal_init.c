@@ -87,7 +87,7 @@ const i2cHardware_t i2cHardware[I2CDEV_COUNT] = {
         .er_irq = I2C4_ER_IRQn,
     },
 #endif
-#elif defined(STM32H7)
+#elif defined(STM32H7) || defined(STM32H5)
 #ifdef USE_I2C_DEVICE_1
     {
         .device = I2CDEV_1,
@@ -218,7 +218,7 @@ void i2cInit(I2CDevice device)
 #if defined(STM32F7)
     IOConfigGPIOAF(scl, pDev->pullUp ? IOCFG_I2C_PU : IOCFG_I2C, GPIO_AF4_I2C);
     IOConfigGPIOAF(sda, pDev->pullUp ? IOCFG_I2C_PU : IOCFG_I2C, GPIO_AF4_I2C);
-#elif defined(STM32H7) || defined(STM32G4)
+#elif defined(STM32H7) || defined(STM32G4) || defined(STM32H5)
     IOConfigGPIOAF(scl, pDev->pullUp ? IOCFG_I2C_PU : IOCFG_I2C, pDev->sclAF);
     IOConfigGPIOAF(sda, pDev->pullUp ? IOCFG_I2C_PU : IOCFG_I2C, pDev->sdaAF);
 #else

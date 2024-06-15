@@ -40,7 +40,7 @@ typedef struct dmaResource_s dmaResource_t;
 
 #if defined(STM32F4) || defined(STM32F7)
 #define DMA_ARCH_TYPE DMA_Stream_TypeDef
-#elif defined(STM32H7)
+#elif defined(STM32H7) || defined(STM32H5) || defined(STM32H5)
 // H7 has stream based DMA and channel based BDMA, but we ignore BDMA (for now).
 #define DMA_ARCH_TYPE DMA_Stream_TypeDef
 #elif defined(AT32F435)
@@ -55,7 +55,7 @@ typedef void (*dmaCallbackHandlerFuncPtr)(struct dmaChannelDescriptor_s *channel
 typedef struct dmaChannelDescriptor_s {
     DMA_TypeDef*                dma;
     dmaResource_t               *ref;
-#if defined(STM32F4) || defined(STM32F7) || defined(STM32G4) || defined(STM32H7)
+#if defined(STM32F4) || defined(STM32F7) || defined(STM32G4) || defined(STM32H7) || defined(STM32H5)
     uint8_t                     stream;
 #endif
     uint32_t                    channel;
@@ -75,7 +75,7 @@ typedef struct dmaChannelDescriptor_s {
 
 #if defined(USE_ATBSP_DRIVER)
 
-#elif defined(STM32F4) || defined(STM32F7) || defined(STM32H7)
+#elif defined(STM32F4) || defined(STM32F7) || defined(STM32H7) || defined(STM32H5)
 
 typedef enum {
     DMA_NONE = 0,
@@ -221,7 +221,7 @@ typedef enum {
 #if defined(STM32F4) || defined(STM32F7)
 #define IS_DMA_ENABLED(reg) (((DMA_ARCH_TYPE *)(reg))->CR & DMA_SxCR_EN)
 #define REG_NDTR NDTR
-#elif defined(STM32H7)
+#elif defined(STM32H7) || defined(STM32H5)
 // For H7, we have to differenciate DMA1/2 and BDMA for access to the control register.
 // HAL library has a macro for this, but it is extremely inefficient in that it compares
 // the address against all possible values.

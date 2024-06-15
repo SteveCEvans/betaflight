@@ -76,7 +76,7 @@ static LL_SPI_InitTypeDef defaultInit =
 
 static uint32_t spiDivisorToBRbits(const SPI_TypeDef *instance, uint16_t divisor)
 {
-#if !defined(STM32H7)
+#if !defined(STM32H7) && !defined(STM32H5)
     // SPI2 and SPI3 are on APB1/AHB1 which PCLK is half that of APB2/AHB2.
 
     if (instance == SPI2 || instance == SPI3) {
@@ -88,7 +88,7 @@ static uint32_t spiDivisorToBRbits(const SPI_TypeDef *instance, uint16_t divisor
 
     divisor = constrain(divisor, 2, 256);
 
-#if defined(STM32H7)
+#if defined(STM32H7) || defined(STM32H5)
     const uint32_t baudRatePrescaler[8] = {
         LL_SPI_BAUDRATEPRESCALER_DIV2,
         LL_SPI_BAUDRATEPRESCALER_DIV4,
@@ -130,7 +130,7 @@ void spiInitDevice(SPIDevice device)
     LL_SPI_Disable(spi->dev);
     LL_SPI_DeInit(spi->dev);
 
-#if defined(STM32H7)
+#if defined(STM32H7) || defined(STM32H5)
     // Prevent glitching when SPI is disabled
     LL_SPI_EnableGPIOControl(spi->dev);
 
@@ -149,14 +149,14 @@ void spiInternalResetDescriptors(busDevice_t *bus)
     LL_DMA_InitTypeDef *initTx = bus->initTx;
 
     LL_DMA_StructInit(initTx);
-#if defined(STM32G4) || defined(STM32H7)
+#if defined(STM32G4) || defined(STM32H7) || defined(STM32H5)
     initTx->PeriphRequest = bus->dmaTx->channel;
 #else
     initTx->Channel = bus->dmaTx->channel;
 #endif
     initTx->Mode = LL_DMA_MODE_NORMAL;
     initTx->Direction = LL_DMA_DIRECTION_MEMORY_TO_PERIPH;
-#if defined(STM32H7)
+#if defined(STM32H7) || defined(STM32H5)
     initTx->PeriphOrM2MSrcAddress = (uint32_t)&bus->busType_u.spi.instance->TXDR;
 #else
     initTx->PeriphOrM2MSrcAddress = (uint32_t)&bus->busType_u.spi.instance->DR;
@@ -170,14 +170,14 @@ void spiInternalResetDescriptors(busDevice_t *bus)
         LL_DMA_InitTypeDef *initRx = bus->initRx;
 
         LL_DMA_StructInit(initRx);
-#if defined(STM32G4) || defined(STM32H7)
+#if defined(STM32G4) || defined(STM32H7) || defined(STM32H5)
         initRx->PeriphRequest = bus->dmaRx->channel;
 #else
         initRx->Channel = bus->dmaRx->channel;
 #endif
         initRx->Mode = LL_DMA_MODE_NORMAL;
         initRx->Direction = LL_DMA_DIRECTION_PERIPH_TO_MEMORY;
-#if defined(STM32H7)
+#if defined(STM32H7) || defined(STM32H5)
         initRx->PeriphOrM2MSrcAddress = (uint32_t)&bus->busType_u.spi.instance->RXDR;
 #else
         initRx->PeriphOrM2MSrcAddress = (uint32_t)&bus->busType_u.spi.instance->DR;
@@ -206,7 +206,7 @@ void spiInternalResetStream(dmaChannelDescriptor_t *descriptor)
 
 FAST_CODE static bool spiInternalReadWriteBufPolled(SPI_TypeDef *instance, const uint8_t *txData, uint8_t *rxData, int len)
 {
-#if defined(STM32H7)
+#if defined(STM32H7) || defined(STM32H5)
     LL_SPI_SetTransferSize(instance, len);
     LL_SPI_Enable(instance);
     LL_SPI_StartMasterTransfer(instance);
@@ -310,7 +310,7 @@ void spiInternalInitStream(const extDevice_t *dev, bool preInit)
     }
     initTx->NbData = len;
 
-#if !defined(STM32G4) && !defined(STM32H7) 
+#if !defined(STM32G4) && !defined(STM32H7)  || defined(STM32H5)
     if (dev->bus->dmaRx) {
 #endif
         uint8_t *rxData = segment->u.buffers.rxData;
@@ -341,7 +341,7 @@ void spiInternalInitStream(const extDevice_t *dev, bool preInit)
         initRx->MemoryOrM2MDstIncMode = LL_DMA_MEMORY_NOINCREMENT;
     }
     initRx->NbData = len;
-#if !defined(STM32G4) && !defined(STM32H7) 
+#if !defined(STM32G4) && !defined(STM32H7)  && !defined(STM32H5)
     }
 #endif
 }
@@ -353,7 +353,7 @@ void spiInternalStartDMA(const extDevice_t *dev)
     dmaChannelDescriptor_t *dmaTx = bus->dmaTx;
     dmaChannelDescriptor_t *dmaRx = bus->dmaRx;
 
-#if !defined(STM32G4) && !defined(STM32H7) 
+#if !defined(STM32G4) && !defined(STM32H7)  && !defined(STM32H5)
     if (dmaRx) {
 #endif
         // Use the correct callback argument
@@ -407,7 +407,7 @@ void spiInternalStartDMA(const extDevice_t *dev)
          */
 
         // Enable the SPI DMA Tx & Rx requests
-#if defined(STM32H7)
+#if defined(STM32H7) || defined(STM32H5)
         LL_SPI_SetTransferSize(dev->bus->busType_u.spi.instance, dev->bus->curSegment->len);
         LL_DMA_EnableStream(dmaTx->dma, dmaTx->stream);
         LL_DMA_EnableStream(dmaRx->dma, dmaRx->stream);
@@ -421,7 +421,7 @@ void spiInternalStartDMA(const extDevice_t *dev)
 
         SET_BIT(dev->bus->busType_u.spi.instance->CR2, SPI_CR2_TXDMAEN | SPI_CR2_RXDMAEN);
 #endif
-#if !defined(STM32G4) && !defined(STM32H7) 
+#if !defined(STM32G4) && !defined(STM32H7)  && !defined(STM32H5)
     } else {
         DMA_Stream_TypeDef *streamRegsTx = (DMA_Stream_TypeDef *)dmaTx->ref;
 
@@ -464,7 +464,7 @@ void spiInternalStopDMA (const extDevice_t *dev)
     dmaChannelDescriptor_t *dmaRx = bus->dmaRx;
     SPI_TypeDef *instance = bus->busType_u.spi.instance;
 
-#if !defined(STM32G4) && !defined(STM32H7)
+#if !defined(STM32G4) && !defined(STM32H7) && !defined(STM32H5)
     if (dmaRx) {
 #endif
         // Disable the DMA engine and SPI interface
@@ -481,11 +481,11 @@ void spiInternalStopDMA (const extDevice_t *dev)
 
         LL_SPI_DisableDMAReq_TX(instance);
         LL_SPI_DisableDMAReq_RX(instance);
-#if defined(STM32H7)
+#if defined(STM32H7) || defined(STM32H5)
         LL_SPI_ClearFlag_TXTF(dev->bus->busType_u.spi.instance);
         LL_SPI_Disable(dev->bus->busType_u.spi.instance);
 #endif
-#if !defined(STM32G4) && !defined(STM32H7) 
+#if !defined(STM32G4) && !defined(STM32H7)  && !defined(STM32H5)
     } else {
         SPI_TypeDef *instance = bus->busType_u.spi.instance;
 
@@ -504,7 +504,7 @@ void spiInternalStopDMA (const extDevice_t *dev)
 
         LL_SPI_DisableDMAReq_TX(instance);
 #endif
-#if !defined(STM32G4) && !defined(STM32H7)
+#if !defined(STM32G4) && !defined(STM32H7) && !defined(STM32H5)
     }
 #endif
 }
@@ -522,7 +522,7 @@ FAST_CODE void spiSequenceStart(const extDevice_t *dev)
     bus->initSegment = true;
 
     // Switch bus speed
-#if !defined(STM32H7)
+#if !defined(STM32H7) && !defined(STM32H5)
     LL_SPI_Disable(instance);
 #endif
 
@@ -547,7 +547,7 @@ FAST_CODE void spiSequenceStart(const extDevice_t *dev)
         bus->busType_u.spi.leadingEdge = dev->busType_u.spi.leadingEdge;
     }
 
-#if !defined(STM32H7)
+#if !defined(STM32H7) && !defined(STM32H5)
     LL_SPI_Enable(instance);
 #endif
 

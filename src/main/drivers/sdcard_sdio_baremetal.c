@@ -201,7 +201,7 @@ static void sdcardSdio_init(const sdcardConfig_t *config, const spiPinConfig_t *
     }
 
 #ifdef USE_DMA_SPEC
-#if !defined(STM32H7) // H7 uses IDMA
+#if !defined(STM32H7)  || defined(STM32H5)// H7 uses IDMA
     const dmaChannelSpec_t *dmaChannelSpec = dmaGetChannelSpecByPeripheral(DMA_PERIPH_SDIO, 0, sdioConfig()->dmaopt);
 
     if (!dmaChannelSpec) {
@@ -223,7 +223,7 @@ static void sdcardSdio_init(const sdcardConfig_t *config, const spiPinConfig_t *
         sdcard.useCache = 0;
     }
 #ifdef USE_DMA_SPEC
-#if defined(STM32H7) // H7 uses IDMA
+#if defined(STM32H7)  || defined(STM32H5)// H7 uses IDMA
     SD_Initialize_LL(0);
 #else
     SD_Initialize_LL((DMA_ARCH_TYPE *)dmaChannelSpec->ref);
@@ -586,13 +586,13 @@ static sdcardOperationStatus_e sdcardSdio_beginWriteBlocks(uint32_t blockIndex, 
 static bool sdcardSdio_readBlock(uint32_t blockIndex, uint8_t *buffer, sdcard_operationCompleteCallback_c callback, uint32_t callbackData)
 {
     if (sdcard.state != SDCARD_STATE_READY) {
-		if (sdcard.state == SDCARD_STATE_WRITING_MULTIPLE_BLOCKS) {
-			if (sdcard_endWriteBlocks() != SDCARD_OPERATION_SUCCESS) {
-				return false;
-			}
-		} else {
-			return false;
-		}
+        if (sdcard.state == SDCARD_STATE_WRITING_MULTIPLE_BLOCKS) {
+            if (sdcard_endWriteBlocks() != SDCARD_OPERATION_SUCCESS) {
+                return false;
+            }
+        } else {
+            return false;
+        }
     }
 
 #ifdef SDCARD_PROFILING

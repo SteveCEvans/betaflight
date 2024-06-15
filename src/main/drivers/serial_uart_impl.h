@@ -48,7 +48,7 @@
 #define UART_TX_BUFFER_SIZE     256
 #endif
 #endif
-#elif defined(STM32H7)
+#elif defined(STM32H7) || defined(STM32H5)
 #define UARTDEV_COUNT_MAX 11 // UARTs 1 to 10 + LPUART1
 #define UARTHARDWARE_MAX_PINS 5
 #ifndef UART_RX_BUFFER_SIZE
@@ -163,7 +163,7 @@
 
 typedef struct uartPinDef_s {
     ioTag_t pin;
-#if defined(STM32F7) || defined(STM32H7) || defined(STM32G4) || defined(AT32F43x)
+#if defined(STM32F7) || defined(STM32H7) || defined(STM32G4) || defined(AT32F43x) || defined(STM32H5)
     uint8_t af;
 #endif
 } uartPinDef_t;
@@ -178,7 +178,7 @@ typedef struct uartHardware_s {
     // For H7 and G4  , {tx|rx}DMAChannel are DMAMUX input index for  peripherals (DMA_REQUEST_xxx); H7:RM0433 Table 110, G4:RM0440 Table 80.
     // For F4 and F7, these are 32-bit channel identifiers (DMA_CHANNEL_x)
     // For at32f435/7 DmaChannel is the dmamux ,need to call dmamuxenable using dmamuxid
-#if defined(STM32F4) || defined(STM32F7) || defined(STM32H7) || defined(STM32G4) 
+#if defined(STM32F4) || defined(STM32F7) || defined(STM32H7) || defined(STM32G4)  || defined(STM32H5)
     uint32_t txDMAChannel;
     uint32_t rxDMAChannel;
 #elif defined(AT32F4)
@@ -197,7 +197,7 @@ typedef struct uartHardware_s {
     uint8_t af;
 #endif
 
-#if defined(STM32F7) || defined(STM32H7) || defined(STM32G4)
+#if defined(STM32F7) || defined(STM32H7) || defined(STM32G4) || defined(STM32H5)
     uint8_t txIrq;
     uint8_t rxIrq;
 #else
@@ -255,7 +255,7 @@ void uartDmaIrqHandler(dmaChannelDescriptor_t* descriptor);
 bool checkUsartTxOutput(uartPort_t *s);
 void uartTxMonitor(uartPort_t *s);
 
-#if defined(STM32F7) || defined(STM32H7) || defined(STM32G4)
+#if defined(STM32F7) || defined(STM32H7) || defined(STM32G4) || defined(STM32H5)
 #define UART_REG_RXD(base) ((base)->RDR)
 #define UART_REG_TXD(base) ((base)->TDR)
 #elif defined(STM32F4)

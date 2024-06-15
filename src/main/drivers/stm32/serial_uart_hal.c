@@ -108,7 +108,7 @@ void uartReconfigure(uartPort_t *uartPort)
     uartPort->Handle.Init.HwFlowCtl = UART_HWCONTROL_NONE;
     uartPort->Handle.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
     uartPort->Handle.Init.Mode = 0;
-#if defined(STM32G4) || defined(STM32H7)
+#if defined(STM32G4) || defined(STM32H7) || defined(STM32H5)
     if (uartPort->Handle.Instance == LPUART1) {
         uartPort->Handle.Init.ClockPrescaler = UART_PRESCALER_DIV8;
     }
@@ -146,7 +146,7 @@ void uartReconfigure(uartPort_t *uartPort)
         if (uartPort->rxDMAResource)
         {
             uartPort->rxDMAHandle.Instance = (DMA_ARCH_TYPE *)uartPort->rxDMAResource;
-#if !(defined(STM32H7) || defined(STM32G4))
+#if !(defined(STM32H7) || defined(STM32G4) || defined(STM32H5))
             uartPort->rxDMAHandle.Init.Channel = uartPort->rxDMAChannel;
 #else
             uartPort->txDMAHandle.Init.Request = uartPort->rxDMAChannel;
@@ -196,7 +196,7 @@ void uartReconfigure(uartPort_t *uartPort)
 #ifdef USE_DMA
         if (uartPort->txDMAResource) {
             uartPort->txDMAHandle.Instance = (DMA_ARCH_TYPE *)uartPort->txDMAResource;
-#if !(defined(STM32H7) || defined(STM32G4))
+#if !(defined(STM32H7) || defined(STM32G4) || defined(STM32H5))
             uartPort->txDMAHandle.Init.Channel = uartPort->txDMAChannel;
 #else
             uartPort->txDMAHandle.Init.Request = uartPort->txDMAChannel;

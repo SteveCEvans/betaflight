@@ -359,7 +359,7 @@ bool pwmDshotMotorHardwareConfig(const timerHardware_t *timerHardware, uint8_t m
     if (useBurstDshot) {
         motor->timer->dmaBurstBuffer = &dshotBurstDmaBuffer[timerIndex][0];
 
-#if defined(STM32H7) || defined(STM32G4)
+#if defined(STM32H7) || defined(STM32G4) || defined(STM32H5)
         DMAINIT.PeriphRequest = dmaChannel;
 #else
         DMAINIT.Channel = dmaChannel;
@@ -374,7 +374,7 @@ bool pwmDshotMotorHardwareConfig(const timerHardware_t *timerHardware, uint8_t m
     {
         motor->dmaBuffer = &dshotDmaBuffer[motorIndex][0];
 
-#if defined(STM32H7) || defined(STM32G4)
+#if defined(STM32H7) || defined(STM32G4) || defined(STM32H5)
         DMAINIT.PeriphRequest = dmaChannel;
 #else
         DMAINIT.Channel = dmaChannel;

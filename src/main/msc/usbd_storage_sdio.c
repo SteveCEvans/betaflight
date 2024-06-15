@@ -171,7 +171,7 @@ static int8_t STORAGE_Init (uint8_t lun)
 
     if (!dmaChannelSpec || !SD_Initialize_LL((DMA_ARCH_TYPE *)dmaChannelSpec->ref)) {
 #else
-#if defined(STM32H7) // H7 uses IDMA
+#if defined(STM32H7)  || defined(STM32H5)// H7 uses IDMA
     if (!SD_Initialize_LL(0)) {
 #else
     if (!SD_Initialize_LL(SDCARD_SDIO_DMA_OPT)) {

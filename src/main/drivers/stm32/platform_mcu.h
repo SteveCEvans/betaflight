@@ -45,6 +45,31 @@
 #define STM32G4
 #endif
 
+#elif defined(STM32H563xx)
+#include "stm32h5xx.h"
+#include "stm32h5xx_hal.h"
+#include "system_stm32h5xx.h"
+
+#include "stm32h5xx_ll_spi.h"
+#include "stm32h5xx_ll_gpio.h"
+#include "stm32h5xx_ll_dma.h"
+#include "stm32h5xx_ll_rcc.h"
+#include "stm32h5xx_ll_bus.h"
+#include "stm32h5xx_ll_tim.h"
+#include "stm32h5xx_ll_system.h"
+#include "drivers/stm32/stm32h5xx_ll_ex.h"
+
+// Chip Unique ID on H5
+#define U_ID_0 (*(uint32_t*)UID_BASE)
+#define U_ID_1 (*(uint32_t*)(UID_BASE + 4))
+#define U_ID_2 (*(uint32_t*)(UID_BASE + 8))
+
+#define USE_PIN_AF
+
+#ifndef STM32H5
+#define STM32H5
+#endif
+
 #elif defined(STM32H743xx) || defined(STM32H750xx) || defined(STM32H7A3xx) || defined(STM32H7A3xxQ) || defined(STM32H723xx) || defined(STM32H725xx) || defined(STM32H730xx)
 #include "stm32h7xx.h"
 #include "stm32h7xx_hal.h"
@@ -185,7 +210,7 @@
 #define USE_LATE_TASK_STATISTICS
 #endif
 
-#if defined(STM32F4) || defined(STM32F7) || defined(STM32H7) || defined(STM32G4)
+#if defined(STM32F4) || defined(STM32F7) || defined(STM32H7) || defined(STM32G4) || defined(STM32H5)
 #define TASK_GYROPID_DESIRED_PERIOD     125 // 125us = 8kHz
 #define SCHEDULER_DELAY_LIMIT           10
 #else
@@ -201,7 +226,7 @@
 #define DEFAULT_CPU_OVERCLOCK 0
 #endif
 
-#if defined(STM32H7)
+#if defined(STM32H7) || defined(STM32H5)
 // Move ISRs to fast ram to avoid flash latency.
 #define FAST_IRQ_HANDLER FAST_CODE
 #else
@@ -226,13 +251,13 @@
 #define STATIC_DMA_DATA_AUTO        static DMA_DATA
 #endif
 
-#if defined(STM32F4) || defined(STM32H7)
+#if defined(STM32F4) || defined(STM32H7) || defined(STM32H5)
 // Data in RAM which is guaranteed to not be reset on hot reboot
 #define PERSISTENT                  __attribute__ ((section(".persistent_data"), aligned(4)))
 #endif
 
 #ifdef USE_DMA_RAM
-#if defined(STM32H7)
+#if defined( || defined(STM32H5))
 #define DMA_RAM __attribute__((section(".DMA_RAM"), aligned(32)))
 #define DMA_RW_AXI __attribute__((section(".DMA_RW_AXI"), aligned(32)))
 extern uint8_t _dmaram_start__;

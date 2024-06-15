@@ -40,7 +40,7 @@
 
 #ifdef USE_QUADSPI
 
-#if !defined(STM32H7)
+#if !(defined(STM32H7) || defined(STM32H5))
 #error Quad SPI unsupported on this MCU
 #endif
 

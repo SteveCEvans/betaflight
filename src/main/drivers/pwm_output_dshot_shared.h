@@ -21,7 +21,7 @@
 #ifdef USE_DSHOT
 
 extern FAST_DATA_ZERO_INIT uint8_t dmaMotorTimerCount;
-#if defined(STM32F7) || defined(STM32H7)
+#if defined(STM32F7) || defined(STM32H7) || defined(STM32H5)
 extern FAST_DATA_ZERO_INIT motorDmaTimer_t dmaMotorTimers[MAX_DMA_TIMERS];
 extern FAST_DATA_ZERO_INIT motorDmaOutput_t dmaMotors[MAX_SUPPORTED_MOTORS];
 #else
@@ -51,7 +51,7 @@ void dshotEnableChannels(uint8_t motorCount);
 void pwmDshotSetDirectionOutput(
     motorDmaOutput_t * const motor
 #ifndef USE_DSHOT_TELEMETRY
-#if defined(STM32F7) || defined(STM32H7)
+#if defined(STM32F7) || defined(STM32H7) || defined(STM32H5)
     , LL_TIM_OC_InitTypeDef* pOcInit, LL_DMA_InitTypeDef* pDmaInit
 #else
     , TIM_OCInitTypeDef *pOcInit, DMA_InitTypeDef* pDmaInit

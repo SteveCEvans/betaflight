@@ -67,7 +67,7 @@ void persistentObjectRTCEnable(void)
     RTC_HandleTypeDef rtcHandle = { .Instance = RTC };
 #endif
 
-#if !defined(STM32H7)
+#if !defined(STM32H7) && !defined(STM32H5)
     __HAL_RCC_PWR_CLK_ENABLE(); // Enable Access to PWR
 #endif
 

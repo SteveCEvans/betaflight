@@ -49,7 +49,7 @@ const struct ioPortDef_s ioPortDefs[] = {
     { RCC_AHB1(GPIOE) },
     { RCC_AHB1(GPIOF) },
 };
-#elif defined(STM32H7)
+#elif defined(STM32H7) || defined(STM32H5)
 const struct ioPortDef_s ioPortDefs[] = {
     { RCC_AHB4(GPIOA) },
     { RCC_AHB4(GPIOB) },
@@ -82,7 +82,7 @@ uint32_t IO_EXTI_Line(IO_t io)
     if (!io) {
         return 0;
     }
-#if defined(STM32F4) || defined(STM32F7) || defined(STM32H7) || defined(STM32G4)
+#if defined(STM32F4) || defined(STM32F7) || defined(STM32H7) || defined(STM32G4) || defined(STM32H5)
     return 1 << IO_GPIOPinIdx(io);
 #elif defined(SIMULATOR_BUILD)
     return 0;
@@ -189,7 +189,7 @@ void IOToggle(IO_t io)
 #endif
 }
 
-#if defined(STM32H7) || defined(STM32G4)
+#if defined(STM32H7) || defined(STM32G4) || defined(STM32H5)
 
 void IOConfigGPIO(IO_t io, ioConfig_t cfg)
 {

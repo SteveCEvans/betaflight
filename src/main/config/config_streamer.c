@@ -55,7 +55,7 @@ void config_streamer_start(config_streamer_t *c, uintptr_t base, int size)
 #if defined(CONFIG_IN_RAM) || defined(CONFIG_IN_EXTERNAL_FLASH) || defined(CONFIG_IN_SDCARD)
         // NOP
 #elif defined(CONFIG_IN_FLASH) || defined(CONFIG_IN_FILE)
-#if defined(STM32F7) || defined(STM32H7) || defined(STM32G4)
+#if defined(STM32F7) || defined(STM32H7) || defined(STM32G4) || defined(STM32H5)
         HAL_FLASH_Unlock();
 #elif defined(AT32F4)
         flash_unlock();
@@ -73,7 +73,7 @@ void config_streamer_start(config_streamer_t *c, uintptr_t base, int size)
     FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR | FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR);
 #elif defined(STM32F7)
     // NOP
-#elif defined(STM32H7)
+#elif defined(STM32H7) || defined(STM32H5)
     // NOP
 #elif defined(STM32G4)
     // NOP
@@ -399,7 +399,7 @@ static int write_word(config_streamer_t *c, config_streamer_buffer_align_type_t 
 
 #elif defined(CONFIG_IN_FLASH)
 
-#if defined(STM32H7)
+#if defined(STM32H7) || defined(STM32H5)
     if (c->address % FLASH_PAGE_SIZE == 0) {
         FLASH_EraseInitTypeDef EraseInitStruct = {
             .TypeErase     = FLASH_TYPEERASE_SECTORS,
@@ -539,7 +539,7 @@ int config_streamer_finish(config_streamer_t *c)
 #elif defined(CONFIG_IN_FILE)
         FLASH_Lock();
 #elif defined(CONFIG_IN_FLASH)
-#if defined(STM32F7) || defined(STM32H7) || defined(STM32G4)
+#if defined(STM32F7) || defined(STM32H7) || defined(STM32G4) || defined(STM32H5)
         HAL_FLASH_Lock();
 #elif defined(AT32F4)
         flash_lock();
