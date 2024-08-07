@@ -41,6 +41,8 @@
 #include "drivers/accgyro/accgyro.h"
 #include "drivers/system.h"
 
+#include "drivers/pinio.h"
+
 #include "fc/core.h"
 #include "fc/tasks.h"
 
@@ -802,14 +804,21 @@ FAST_CODE void scheduler(void)
 #if defined(USE_LATE_TASK_STATISTICS)
                 taskCount++;
 #endif  // USE_LATE_TASK_STATISTICS
-            } else if ((selectedTask->taskAgePeriods > TASK_AGE_EXPEDITE_COUNT) ||
+            } else {
+                if ((currentTask - tasks) == TASK_OSD) {
+                    // No time to execute scheduled OSD task
+                    pinioSet(2, 1);
+                    pinioSet(2, 0);
+                }
+                if ((selectedTask->taskAgePeriods > TASK_AGE_EXPEDITE_COUNT) ||
 #ifdef USE_OSD
-                       (((selectedTask - tasks) == TASK_OSD) && (TASK_AGE_EXPEDITE_OSD != 0) && (++skippedOSDAttempts > TASK_AGE_EXPEDITE_OSD)) ||
+                        (((selectedTask - tasks) == TASK_OSD) && (TASK_AGE_EXPEDITE_OSD != 0) && (++skippedOSDAttempts > TASK_AGE_EXPEDITE_OSD)) ||
 #endif
-                       (((selectedTask - tasks) == TASK_RX) && (TASK_AGE_EXPEDITE_RX != 0) && (++skippedRxAttempts > TASK_AGE_EXPEDITE_RX))) {
-                // If a task has been unable to run, then reduce it's recorded estimated run time to ensure
-                // it's ultimate scheduling
-                selectedTask->anticipatedExecutionTime *= TASK_AGE_EXPEDITE_SCALE;
+                           (((selectedTask - tasks) == TASK_RX) && (TASK_AGE_EXPEDITE_RX != 0) && (++skippedRxAttempts > TASK_AGE_EXPEDITE_RX))) {
+                    // If a task has been unable to run, then reduce it's recorded estimated run time to ensure
+                    // it's ultimate scheduling
+                    selectedTask->anticipatedExecutionTime *= TASK_AGE_EXPEDITE_SCALE;
+                }
             }
         }
     }

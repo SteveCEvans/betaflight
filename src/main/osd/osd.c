@@ -60,6 +60,8 @@
 #include "drivers/sdcard.h"
 #include "drivers/time.h"
 
+#include "drivers/pinio.h"
+
 #include "fc/core.h"
 #include "fc/gps_lap_timer.h"
 #include "fc/rc_controls.h"
@@ -1501,6 +1503,7 @@ void osdUpdate(timeUs_t currentTimeUs)
 
     case OSD_STATE_UPDATE_ELEMENTS:
         {
+            pinioSet(1, 1);
             bool moreElements = true;
 
             uint8_t osdElement = osdGetActiveElement();
@@ -1517,6 +1520,8 @@ void osdUpdate(timeUs_t currentTimeUs)
                 // Slowly decay the max time
                 osdElementDurationFractionUs[osdElement]--;
             }
+
+            pinioSet(1, 0);
 
             if (moreElements) {
                 // There are more elements to draw
@@ -1555,6 +1560,9 @@ void osdUpdate(timeUs_t currentTimeUs)
         break;
 
     case OSD_STATE_TRANSFER:
+        pinioSet(0, 1);
+        pinioSet(0, 0);
+
         // Wait for any current transfer to complete
         if (displayIsTransferInProgress(osdDisplayPort)) {
             break;
