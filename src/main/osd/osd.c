@@ -1378,6 +1378,7 @@ void osdUpdate(timeUs_t currentTimeUs)
     timeUs_t executeTimeUs;
     osdState_e osdCurrentState = osdState;
 
+    pinioSet(1, 1);
     if (osdState != OSD_STATE_UPDATE_CANVAS) {
         schedulerIgnoreTaskExecRate();
     }
@@ -1467,6 +1468,9 @@ void osdUpdate(timeUs_t currentTimeUs)
         break;
 
     case OSD_STATE_UPDATE_CANVAS:
+        pinioSet(0, 1);
+        pinioSet(0, 0);
+
         // Hide OSD when OSDSW mode is active
         if (IS_RC_MODE_ACTIVE(BOXOSD)) {
             displayClearScreen(osdDisplayPort, DISPLAY_CLEAR_NONE);
@@ -1503,7 +1507,6 @@ void osdUpdate(timeUs_t currentTimeUs)
 
     case OSD_STATE_UPDATE_ELEMENTS:
         {
-            pinioSet(1, 1);
             bool moreElements = true;
 
             uint8_t osdElement = osdGetActiveElement();
@@ -1520,8 +1523,6 @@ void osdUpdate(timeUs_t currentTimeUs)
                 // Slowly decay the max time
                 osdElementDurationFractionUs[osdElement]--;
             }
-
-            pinioSet(1, 0);
 
             if (moreElements) {
                 // There are more elements to draw
@@ -1560,9 +1561,6 @@ void osdUpdate(timeUs_t currentTimeUs)
         break;
 
     case OSD_STATE_TRANSFER:
-        pinioSet(0, 1);
-        pinioSet(0, 0);
-
         // Wait for any current transfer to complete
         if (displayIsTransferInProgress(osdDisplayPort)) {
             break;
@@ -1601,6 +1599,8 @@ void osdUpdate(timeUs_t currentTimeUs)
     } else {
         schedulerSetNextStateTime((osdStateDurationFractionUs[osdState] >> OSD_EXEC_TIME_SHIFT) + OSD_TASK_MARGIN);
     }
+
+    pinioSet(1, 0);
 }
 
 void osdSuppressStats(bool flag)
