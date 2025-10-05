@@ -499,13 +499,13 @@ static void osdCompleteInitialization(void)
     // sizeof includes the terminating NULL so add space for the V
     char version_str_buf[sizeof(FC_VERSION_STRING) + 1];
     tfp_sprintf(version_str_buf, "V%s", FC_VERSION_STRING);
-    size_t version_str_len = strlen(version_str_buf) + 1;
+    size_t version_str_len = strlen(version_str_buf);
 
     // For the OSD we only have uppercase
     for (size_t i = 0; i < version_str_len; i++) {
         version_str_buf[i] = toupper(version_str_buf[i]);
     }
-    displayWrite(osdDisplayPort, midCol + 12 - version_str_len, midRow, DISPLAYPORT_SEVERITY_NORMAL, version_str_buf);
+    displayWrite(osdDisplayPort, midCol + 11 - version_str_len, midRow, DISPLAYPORT_SEVERITY_NORMAL, version_str_buf);
 
     #ifdef USE_CMS
     displayWrite(osdDisplayPort, midCol - 8, midRow + 2,  DISPLAYPORT_SEVERITY_NORMAL, CMS_STARTUP_HELP_TEXT1);
