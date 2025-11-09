@@ -25,6 +25,8 @@
 
 #include "fc/init.h"
 
+#include "platform/multicore.h"
+
 #include "scheduler/scheduler.h"
 
 void run(void);
@@ -39,7 +41,13 @@ int main(int argc, char * argv[])
 #endif
     init();
 
-    run();
+    // Launch the scheduler on the other core if possible
+    multicoreExecute(run);
+
+    // Enter a loop waking on any event/interrupt
+    while (true) {
+        __wfe();
+    }
 
     return 0;
 }
