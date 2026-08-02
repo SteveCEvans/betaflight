@@ -366,8 +366,8 @@ static uint16_t gpsDopOrFallback(uint16_t preferredDop, uint16_t fallbackDop)
 
 STATIC_UNIT_TESTED bool gpsMeasurementReadyForFusion(timeUs_t nowUs, float *noiseScale)
 {
-    UNUSED(nowUs); 
-    
+    UNUSED(nowUs);
+
     static int stepsSinceNewGps = 0;
     static int expectedStepsPerGpsInterval = 10;
 
@@ -378,7 +378,7 @@ STATIC_UNIT_TESTED bool gpsMeasurementReadyForFusion(timeUs_t nowUs, float *nois
         float freq = (gpsFrequencyHz > 0.0f) ? gpsFrequencyHz : 10.0f;
         expectedStepsPerGpsInterval = (int)((float)TASK_ALTITUDE_RATE_HZ / freq + 0.5f);
         if (expectedStepsPerGpsInterval < 1) expectedStepsPerGpsInterval = 1;
-        stepsSinceNewGps = 0; 
+        stepsSinceNewGps = 0;
     }
 
 const int absoluteTimeoutLimit = expectedStepsPerGpsInterval * 3 / 2;
@@ -564,8 +564,8 @@ static void feedGPSMeasurements(timeUs_t nowUs)
         DEBUG_SET(DEBUG_POSITION_EST, 7, lrintf(rGpsPos)); // temporary debug for testing
 
 
-kalmanUpdateVelocity(&kfEast, (float)gpsSol.velned.velE, rGpsVel);
-kalmanUpdateVelocity(&kfNorth, (float)gpsSol.velned.velN, rGpsVel);
+        kalmanUpdateVelocity(&kfEast, (float)gpsSol.velned.velE, rGpsVel);
+        kalmanUpdateVelocity(&kfNorth, (float)gpsSol.velned.velN, rGpsVel);
 
         lastXYMeasurementUs = nowUs;
     }
@@ -754,6 +754,9 @@ static void feedOpticalFlowMeasurements(timeUs_t nowUs)
     kalmanUpdateVelocity(&kfEast, velEast, flowR * noiseScale);
     kalmanUpdateVelocity(&kfNorth, velNorth, flowR * noiseScale);
 
+    DEBUG_SET(DEBUG_POSITION_EST, 3, lrintf(velEast)); // temporary debug for testing
+    DEBUG_SET(DEBUG_POSITION_EST, 4, lrintf(velNorth)); // temporary debug for testing
+
     lastXYMeasurementUs = nowUs;
 #else
     UNUSED(nowUs);
@@ -834,7 +837,7 @@ void positionEstimatorUpdate(void)
     DEBUG_SET(DEBUG_POSITION_EST, 0, lrintf(estimate.position.v[debugAxis]));
     DEBUG_SET(DEBUG_POSITION_EST, 1, lrintf(estimate.velocity.v[debugAxis]));
     DEBUG_SET(DEBUG_POSITION_EST, 2, lrintf(estimate.acceleration.v[debugAxis]));
-    
+
     // Validity: based on recent measurement updates
     if (xyEnabled) {
         estimate.isValidXY = (lastXYMeasurementUs > 0) &&

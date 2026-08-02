@@ -498,7 +498,7 @@ bool osdFormatRtcDateTime(char *buffer)
     dateTimeUTCToLocal(&dateTime, &localDateTime);
 
     switch (activeElement.type) {
-    case OSD_ELEMENT_TYPE_3: 
+    case OSD_ELEMENT_TYPE_3:
         tfp_sprintf(buffer, "%02d:%02d:%02d", localDateTime.hours, localDateTime.minutes, localDateTime.seconds);
         break;
     case OSD_ELEMENT_TYPE_2:
@@ -2772,7 +2772,7 @@ void osdUpdateAlarms(void)
     } else {
         CLR_BLINK(OSD_MAIN_BATT_USAGE);
     }
-   
+
     if ((alt >= osdConfig()->alt_alarm) && ARMING_FLAG(ARMED)) {
         SET_BLINK(OSD_ALTITUDE);
     } else {
