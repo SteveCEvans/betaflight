@@ -73,8 +73,8 @@
 
 #define Q_JERK_XY         2000.0f // lower gives smoother, damped acceleration but doesn't smooth  velocity much; below 500 attenuates output acceleration
 #define R_ACCEL_XY        3000.0f
-#define R_GPS_VEL_BASE    2000.0f // ramped during GPS packets, avg increase 1.5x, also inceased as DOP increases
-#define R_GPS_POS_BASE     2000.0f      // cm^2 at pDOP=1.0, also ramped and increased as DOP widens
+#define R_GPS_VEL_BASE    10.0f // ramped during GPS packets, avg increase 1.5x, also inceased as DOP increases
+#define R_GPS_POS_BASE     10.0f      // cm^2 at pDOP=1.0, also ramped and increased as DOP widens
 #define R_OPTICALFLOW_VEL   400.0f     // (cm/s)^2 at max quality
 
 #define Q_JERK_Z         3000.0f
