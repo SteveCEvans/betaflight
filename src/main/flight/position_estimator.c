@@ -368,9 +368,6 @@ STATIC_UNIT_TESTED bool gpsMeasurementReadyForFusion(timeUs_t nowUs, float *nois
 {
     UNUSED(nowUs);
 
-    static int stepsSinceNewGps = 0;
-    static int expectedStepsPerGpsInterval = 10;
-
     const bool hasNewData = gpsHasNewData(&gpsStamp);
     if (hasNewData) {
         const float gpsFrequencyHz = getGpsDataFrequencyHz();
@@ -380,20 +377,14 @@ STATIC_UNIT_TESTED bool gpsMeasurementReadyForFusion(timeUs_t nowUs, float *nois
         if (expectedStepsPerGpsInterval < 1) expectedStepsPerGpsInterval = 1;
         stepsSinceNewGps = 0;
     }
-
 const int absoluteTimeoutLimit = expectedStepsPerGpsInterval * 3 / 2;
 if (!hasNewData && (!gpsDataAvailable || stepsSinceNewGps >= absoluteTimeoutLimit)) {
     return false;
 }
-
-int noiseScaleSteps = (2 * expectedStepsPerGpsInterval) - stepsSinceNewGps;
-if (noiseScaleSteps < expectedStepsPerGpsInterval) {
-    noiseScaleSteps = expectedStepsPerGpsInterval;
-}
-*noiseScale = (float)noiseScaleSteps / (float)expectedStepsPerGpsInterval; // ramps down  from 2->1
+*noiseScale = 1.0f; // fix at 1, or for other test, multiply by expectedStepsPerGpsInterval 
 stepsSinceNewGps++;
 
-return true;
+return true; // always return true, using the old GPS data value until new data arrives 
 }
 #endif
 
