@@ -51,6 +51,7 @@ const positionEstimate3d_t *positionEstimatorGetEstimate(void);
 
 float positionEstimatorGetAltitudeCm(void);
 float positionEstimatorGetAltitudeDerivative(void);
+float positionEstimatorGetVerticalAcceleration(void);
 bool positionEstimatorIsValidXY(void);
 bool positionEstimatorIsValidZ(void);
 float positionEstimatorGetTrustXY(void);
