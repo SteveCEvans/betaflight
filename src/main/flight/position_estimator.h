@@ -50,11 +50,12 @@ void positionEstimatorEnableXY(bool enable);
 const positionEstimate3d_t *positionEstimatorGetEstimate(void);
 
 float positionEstimatorGetAltitudeCm(void);
-float positionEstimatorGetAltitudeDerivative(void);
+float positionEstimatorGetVerticalVelocity(void);
 float positionEstimatorGetVerticalAcceleration(void);
 bool positionEstimatorIsValidXY(void);
 bool positionEstimatorIsValidZ(void);
 float positionEstimatorGetTrustXY(void);
+float positionEstimatorGetTrustZ(void);
 // True when GPS has a fix and is not excluded by positionSource config.
 // Use to decide whether heading validity is required before engaging position hold.
 bool positionEstimatorIsHeadingRequired(void);

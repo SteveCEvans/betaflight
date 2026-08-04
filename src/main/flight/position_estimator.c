@@ -72,15 +72,16 @@
 // R or Measurement noise:  higher means less trust in that input
 
 #define Q_JERK_XY         3000.0f // lower gives smoother, damped acceleration but doesn't smooth  velocity much; below 500 attenuates output acceleration
-#define R_ACCEL_XY        2000.0f // higher reduces accel influence
+#define R_ACCEL_XY        1000.0f // higher reduces accel influence
 #define R_GPS_VEL_BASE     500.0f // increased as DOP increases, typically 5-10x, higher allows more accel influence
 #define R_GPS_POS_BASE     500.0f      // cm^2 at pDOP=1.0, also increases as DOP widens
 #define R_OPTICALFLOW_VEL  400.0f     // (cm/s)^2 at max quality
 
 #define Q_JERK_Z         3000.0f
-#define R_ACCEL_Z        5000.0f
+#define R_ACCEL_Z        1000.0f
 #define R_GPS_ALT_BASE    100.0f      // cm^2 at pDOP=1.0, higher favours other sensors over GPS
 #define R_BARO_ALT        200.0f     // cm^2 lower value favours rapid baro changes
+#define R_GPS_VEL_Z_BASE 1000.0f     // (cm/s)^2 at DOP=1.0
 #define R_RANGEFINDER_ALT 100.0f     // cm^2
 
 // Initial covariance values
@@ -560,26 +561,35 @@ static void feedGPSMeasurements(timeUs_t nowUs)
         lastXYMeasurementUs = nowUs;
     }
 
-    // Z altitude measurement
-    if (gpsAltAllowed) {
-        if (!gpsAltOffsetSet) {
-            gpsAltOffsetCm = gpsSol.llh.altCm;
-            gpsAltOffsetSet = true;
-        }
-
-        // Use altitude_prefer_baro to scale GPS altitude R:
-        // altitude_prefer_baro=100 means strongly prefer baro, so GPS R should be higher
-        const float baroPreference = positionConfig()->altitude_prefer_baro * 0.01f;
-        const uint16_t altDop = gpsDopOrFallback(gpsSol.dop.vdop, gpsSol.dop.pdop);
-        const float gpsAltR = gpsR(R_GPS_ALT_BASE, altDop) * (1.0f + baroPreference * 2.0f) * noiseScale;
-
-        const float gpsRelativeAltCm = gpsSol.llh.altCm - gpsAltOffsetCm;
-        kalmanUpdatePosition(&kfUp, gpsRelativeAltCm, gpsAltR);
-        lastZMeasurementUs = nowUs;
-
-        zCal[CAL_Z_GPS].rawReading = gpsSol.llh.altCm;
-        zCal[CAL_Z_GPS].active = true;
+// Z velocity and altitude measurements
+if (gpsAltAllowed) {
+    if (!gpsAltOffsetSet) {
+        gpsAltOffsetCm = gpsSol.llh.altCm;
+        
+        gpsAltOffsetSet = true;
     }
+
+    // Use altitude_prefer_baro to scale GPS altitude R:
+    // altitude_prefer_baro=100 means strongly prefer baro, so GPS R should be higher
+    const float baroPreference = positionConfig()->altitude_prefer_baro * 0.01f;
+    const uint16_t altDop = gpsDopOrFallback(gpsSol.dop.vdop, gpsSol.dop.pdop);
+
+    const float gpsVelUpR = gpsR(R_GPS_VEL_Z_BASE, altDop) * noiseScale;
+    const float gpsAltR = gpsR(R_GPS_ALT_BASE, altDop) * (1.0f + baroPreference * 2.0f) * noiseScale;
+
+    const float gpsVelocityUp = -(float)gpsSol.velned.velD;
+    const float gpsRelativeAltCm = gpsSol.llh.altCm - gpsAltOffsetCm;
+    DEBUG_SET(DEBUG_ALTITUDE, 2, lrintf(gpsRelativeAltCm / 10.0f));
+    DEBUG_SET(DEBUG_ALTITUDE, 6, lrintf(gpsVelocityUp));
+
+    kalmanUpdateVelocity(&kfUp, gpsVelocityUp, gpsVelUpR);
+    kalmanUpdatePosition(&kfUp, gpsRelativeAltCm, gpsAltR);
+
+    lastZMeasurementUs = nowUs;
+
+    zCal[CAL_Z_GPS].rawReading = gpsSol.llh.altCm;
+    zCal[CAL_Z_GPS].active = true;
+}
 #else
     UNUSED(nowUs);
 #endif
@@ -615,10 +625,11 @@ static void feedBaroMeasurements(timeUs_t nowUs)
 
     // Scale R based on altitude_prefer_baro: higher value = lower baro R = more trust
     const float baroPreference = constrainf(positionConfig()->altitude_prefer_baro * 0.01f, 0.01f, 1.0f);
-    const float baroR = R_BARO_ALT / baroPreference;
-
+    const float baroR = R_BARO_ALT / baroPreference;    
     kalmanUpdatePosition(&kfUp, baroAltCm - baroAltOffsetCm, baroR * noiseScale);
     lastZMeasurementUs = nowUs;
+
+    DEBUG_SET(DEBUG_ALTITUDE, 1, lrintf((baroAltCm - baroAltOffsetCm) / 10.0f));
 
     zCal[CAL_Z_BARO].rawReading = baroAltCm;
     zCal[CAL_Z_BARO].active = true;
@@ -789,12 +800,11 @@ void positionEstimatorUpdate(void)
 
     const float accelToLog = (debugAxis == 0) ? accelEast : accelNorth;
     DEBUG_SET(DEBUG_POSITION_EST, 5, lrintf(accelToLog));
-
     // Z-axis: always runs (for altitude hold, OSD, vario). While disarmed,
     // measure zero acceleration so covariance continues to evolve without
     // integrating small gravity-removal errors.
-    kalmanPredict(&kfUp, dt);
     kalmanUpdateAcceleration(&kfUp, ARMING_FLAG(ARMED) ? accelUp : 0.0f, R_ACCEL_Z);
+    kalmanPredict(&kfUp, dt);
 
     // XY axes: only when a consumer is active
     if (xyEnabled && ARMING_FLAG(ARMED)) {
@@ -855,7 +865,7 @@ float positionEstimatorGetAltitudeCm(void)
     return estimate.position.v[ENU_U];
 }
 
-float positionEstimatorGetAltitudeDerivative(void)
+float positionEstimatorGetVerticalVelocity(void)
 {
     return estimate.velocity.v[ENU_U];
 }
@@ -873,6 +883,11 @@ bool positionEstimatorIsValidXY(void)
 bool positionEstimatorIsValidZ(void)
 {
     return estimate.isValidZ;
+}
+
+float positionEstimatorGetTrustZ(void)
+{
+    return estimate.trustZ;
 }
 
 float positionEstimatorGetTrustXY(void)
