@@ -71,11 +71,12 @@
 // Q or Jerk (process noise): higher allows faster adaptations to data change / offset
 // R or Measurement noise:  higher means less trust in that input
 
-#define Q_JERK_XY         3000.0f // lower gives smoother, damped acceleration but doesn't smooth  velocity much; below 500 attenuates output acceleration
-#define R_ACCEL_XY        1000.0f // higher reduces accel influence
-#define R_GPS_VEL_BASE     500.0f // increased as DOP increases, typically 5-10x, higher allows more accel influence
-#define R_GPS_POS_BASE     500.0f      // cm^2 at pDOP=1.0, also increases as DOP widens
-#define R_OPTICALFLOW_VEL  400.0f     // (cm/s)^2 at max quality
+#define Q_JERK_XY         2000.0f  // lower gives smoother, damped acceleration but doesn't smooth  velocity much; below 500 attenuates output acceleration
+#define R_ACCEL_XY        3000.0f  // higher reduces accel influence
+#define R_GPS_VEL_BASE     60.0f  // increased as DOP increases, typically 5-10x, higher allows more accel influence
+#define R_GPS_POS_BASE    400.0f   // cm^2 at pDOP=1.0, also increases as DOP widens
+#define R_OPTICALFLOW_VEL 400.0f   // (cm/s)^2 at max quality
+#define ACCEL_VELOCITY_LEAD_TIME_XY      0.12f // fraction of acceleration to add to velocity as a lead lag compensator
 
 #define Q_JERK_Z         3000.0f
 #define R_ACCEL_Z        1000.0f
@@ -824,16 +825,20 @@ void positionEstimatorUpdate(void)
     crossCalibrateOffsets(zCal, CAL_Z_COUNT, kalmanGetPosition(&kfUp));
 
     // Extract state into the unified estimate (kfEast/kfNorth/kfUp are the East/North/Up filters)
-    estimate.position.v[ENU_E] = kalmanGetPosition(&kfEast);
-    estimate.position.v[ENU_N] = kalmanGetPosition(&kfNorth);
-    estimate.position.v[ENU_U] = kalmanGetPosition(&kfUp);
-    estimate.velocity.v[ENU_E] = kalmanGetVelocity(&kfEast);
-    estimate.velocity.v[ENU_N] = kalmanGetVelocity(&kfNorth);
-    estimate.velocity.v[ENU_U] = kalmanGetVelocity(&kfUp);
-    estimate.acceleration.v[ENU_E] = kalmanGetAcceleration(&kfEast);
-    estimate.acceleration.v[ENU_N] = kalmanGetAcceleration(&kfNorth);
-    estimate.acceleration.v[ENU_U] = kalmanGetAcceleration(&kfUp);
 
+estimate.position.v[ENU_E] = kalmanGetPosition(&kfEast);
+estimate.position.v[ENU_N] = kalmanGetPosition(&kfNorth);
+estimate.position.v[ENU_U] = kalmanGetPosition(&kfUp);
+
+estimate.velocity.v[ENU_E] = kalmanGetVelocity(&kfEast) + ACCEL_VELOCITY_LEAD_TIME_XY * kalmanGetAcceleration(&kfEast);
+
+estimate.velocity.v[ENU_N] = kalmanGetVelocity(&kfNorth) + ACCEL_VELOCITY_LEAD_TIME_XY * kalmanGetAcceleration(&kfNorth);
+
+estimate.velocity.v[ENU_U] = kalmanGetVelocity(&kfUp);
+
+estimate.acceleration.v[ENU_E] = kalmanGetAcceleration(&kfEast);
+estimate.acceleration.v[ENU_N] = kalmanGetAcceleration(&kfNorth);
+estimate.acceleration.v[ENU_U] = kalmanGetAcceleration(&kfUp);
     DEBUG_SET(DEBUG_POSITION_EST, 0, lrintf(estimate.position.v[debugAxis]));
     DEBUG_SET(DEBUG_POSITION_EST, 1, lrintf(estimate.velocity.v[debugAxis]));
     DEBUG_SET(DEBUG_POSITION_EST, 2, lrintf(estimate.acceleration.v[debugAxis]));
