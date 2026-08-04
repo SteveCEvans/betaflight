@@ -107,19 +107,19 @@ void kalmanPredict(positionKalman_t *kf, float dt)
 //     if (S < 1e-9f) {
 //         return;
 //     }
-// 
+//
 //     float gain[KF_STATE_COUNT];
 //     float measuredRow[KF_STATE_COUNT];
 //     for (unsigned i = 0; i < KF_STATE_COUNT; i++) {
 //         gain[i] = kf->P[i][measuredState] / S;
 //         measuredRow[i] = kf->P[measuredState][i];
 //     }
-// 
+//
 //     const float innovation = measurement - kf->x[measuredState];
 //     for (unsigned i = 0; i < KF_STATE_COUNT; i++) {
 //         kf->x[i] += gain[i] * innovation;
 //     }
-// 
+//
 //     for (unsigned row = 0; row < KF_STATE_COUNT; row++) {
 //         for (unsigned column = 0; column < KF_STATE_COUNT; column++) {
 //             kf->P[row][column] -= gain[row] * measuredRow[column];

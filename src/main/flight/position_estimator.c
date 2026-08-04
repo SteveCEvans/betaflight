@@ -96,6 +96,12 @@
 #define GPS_DOP_MIN_VALID   100         // DOP is stored * 100; values below 1.0 are unset/unrealistic
 #define GPS_DOP_UNKNOWN_R_SCALE 100.0f  // Treat unknown DOP as 10x stddev, 100x variance
 
+// Each GPS fix is reused across the estimator steps that fall inside its source
+// interval, and its noise is scaled by that step count. Normally the count is
+// derived from TASK_ALTITUDE_RATE_HZ / getGpsDataFrequencyHz(); define this to
+// pin it to a fixed value for testing instead.
+//#define USE_FIXED_GPS_DOWNSAMPLE_STEPS 10
+
 // Timeout: if no measurement for this long, mark invalid
 #define MEASUREMENT_TIMEOUT_US  2000000  // 2 seconds
 
@@ -199,6 +205,8 @@ static sensorCalEntry_t zCal[CAL_Z_COUNT];
 static uint16_t gpsStamp = 0;
 static bool gpsDataAvailable = false;
 static timeUs_t gpsDataReceivedAtUs = 0;
+static timeUs_t gpsDataHoldDurationUs = 0;
+static float gpsMeasurementNoiseScale = 1.0f;
 static gpsLocation_t armLocationGps;
 static bool gpsArmLocationSet = false;
 static float gpsAltOffsetCm = 0.0f;
@@ -269,6 +277,8 @@ void positionEstimatorInit(void)
     gpsStamp = 0;
     gpsDataAvailable = false;
     gpsDataReceivedAtUs = 0;
+    gpsDataHoldDurationUs = 0;
+    gpsMeasurementNoiseScale = 1.0f;
     gpsArmLocationSet = false;
     gpsAltOffsetCm = 0.0f;
     gpsAltOffsetSet = false;
@@ -368,26 +378,40 @@ static uint16_t gpsDopOrFallback(uint16_t preferredDop, uint16_t fallbackDop)
 
 STATIC_UNIT_TESTED bool gpsMeasurementReadyForFusion(timeUs_t nowUs, float *noiseScale)
 {
-    UNUSED(nowUs);
-    static int stepsSinceNewGps = 0;
-    static int expectedStepsPerGpsInterval = 10;
     const bool hasNewData = gpsHasNewData(&gpsStamp);
     if (hasNewData) {
-        const float gpsFrequencyHz = getGpsDataFrequencyHz();
         gpsDataAvailable = true;
-        float freq = (gpsFrequencyHz > 0.0f) ? gpsFrequencyHz : 10.0f;
-        expectedStepsPerGpsInterval = (int)((float)TASK_ALTITUDE_RATE_HZ / freq + 0.5f);
-        if (expectedStepsPerGpsInterval < 1) expectedStepsPerGpsInterval = 1;
-        stepsSinceNewGps = 0;
+        gpsDataReceivedAtUs = nowUs;
+#ifdef USE_FIXED_GPS_DOWNSAMPLE_STEPS
+        // Testing override: hold each fix for a fixed number of estimator steps
+        // rather than for the reported GPS interval, so the downsampling ratio
+        // can be swept independently of the receiver's actual nav rate.
+        const float downsampleSteps = fmaxf((float)(USE_FIXED_GPS_DOWNSAMPLE_STEPS), 1.0f);
+        gpsDataHoldDurationUs = (timeUs_t)lrintf(downsampleSteps * 1000000.0f / (float)TASK_ALTITUDE_RATE_HZ);
+        gpsMeasurementNoiseScale = downsampleSteps;
+#else
+        const float gpsFrequencyHz = getGpsDataFrequencyHz();
+
+        if (gpsFrequencyHz > 0.0f) {
+            gpsDataHoldDurationUs = (timeUs_t)lrintf(1000000.0f / gpsFrequencyHz);
+            gpsMeasurementNoiseScale = fmaxf((float)TASK_ALTITUDE_RATE_HZ / gpsFrequencyHz, 1.0f);
+        } else {
+            // An invalid frequency cannot define a safe hold interval.
+            gpsDataHoldDurationUs = 0;
+            gpsMeasurementNoiseScale = 1.0f;
+        }
+#endif
     }
-    const int absoluteTimeoutLimit = expectedStepsPerGpsInterval * 3 / 2;
-    if (!hasNewData && (!gpsDataAvailable || stepsSinceNewGps >= absoluteTimeoutLimit)) {
+
+    const bool withinHoldInterval = gpsDataAvailable &&
+        gpsDataHoldDurationUs > 0 &&
+        nowUs - gpsDataReceivedAtUs < gpsDataHoldDurationUs;
+    if (!hasNewData && !withinHoldInterval) {
         return false;
     }
-*noiseScale = 1.0f; // fix at 1, or for some other test, multiply by expectedStepsPerGpsInterval 
 
-stepsSinceNewGps++;
-return true; // always return true, unless timed out, re-using the same GPS data value until new data arrives, to reduce spikes in velocity trace
+    *noiseScale = gpsMeasurementNoiseScale;
+    return true;
 }
 #endif
 
@@ -549,7 +573,7 @@ static void feedGPSMeasurements(timeUs_t nowUs)
         DEBUG_SET(DEBUG_POSITION_EST, 6, lrintf(rGpsPos * 0.01f)); // temporary debug for testing
 
         // GPS velocity (NED from UBX) -> ENU
-        const float rGpsVel = gpsR(R_GPS_VEL_BASE, xyDop) * noiseScale; 
+        const float rGpsVel = gpsR(R_GPS_VEL_BASE, xyDop) * noiseScale;
         DEBUG_SET(DEBUG_POSITION_EST, 7, lrintf(rGpsPos* 0.01f)); // temporary debug for testing
 
         kalmanUpdateVelocity(&kfEast, (float)gpsSol.velned.velE, rGpsVel);
@@ -562,35 +586,35 @@ static void feedGPSMeasurements(timeUs_t nowUs)
         lastXYMeasurementUs = nowUs;
     }
 
-// Z velocity and altitude measurements
-if (gpsAltAllowed) {
-    if (!gpsAltOffsetSet) {
-        gpsAltOffsetCm = gpsSol.llh.altCm;
-        
-        gpsAltOffsetSet = true;
+    // Z velocity and altitude measurements
+    if (gpsAltAllowed) {
+        if (!gpsAltOffsetSet) {
+            gpsAltOffsetCm = gpsSol.llh.altCm;
+
+            gpsAltOffsetSet = true;
+        }
+
+        // Use altitude_prefer_baro to scale GPS altitude R:
+        // altitude_prefer_baro=100 means strongly prefer baro, so GPS R should be higher
+        const float baroPreference = positionConfig()->altitude_prefer_baro * 0.01f;
+        const uint16_t altDop = gpsDopOrFallback(gpsSol.dop.vdop, gpsSol.dop.pdop);
+
+        const float gpsVelUpR = gpsR(R_GPS_VEL_Z_BASE, altDop) * noiseScale;
+        const float gpsAltR = gpsR(R_GPS_ALT_BASE, altDop) * (1.0f + baroPreference * 2.0f) * noiseScale;
+
+        const float gpsVelocityUp = -(float)gpsSol.velned.velD;
+        const float gpsRelativeAltCm = gpsSol.llh.altCm - gpsAltOffsetCm;
+        DEBUG_SET(DEBUG_ALTITUDE, 2, lrintf(gpsRelativeAltCm / 10.0f));
+        DEBUG_SET(DEBUG_ALTITUDE, 6, lrintf(gpsVelocityUp));
+
+        kalmanUpdateVelocity(&kfUp, gpsVelocityUp, gpsVelUpR);
+        kalmanUpdatePosition(&kfUp, gpsRelativeAltCm, gpsAltR);
+
+        lastZMeasurementUs = nowUs;
+
+        zCal[CAL_Z_GPS].rawReading = gpsSol.llh.altCm;
+        zCal[CAL_Z_GPS].active = true;
     }
-
-    // Use altitude_prefer_baro to scale GPS altitude R:
-    // altitude_prefer_baro=100 means strongly prefer baro, so GPS R should be higher
-    const float baroPreference = positionConfig()->altitude_prefer_baro * 0.01f;
-    const uint16_t altDop = gpsDopOrFallback(gpsSol.dop.vdop, gpsSol.dop.pdop);
-
-    const float gpsVelUpR = gpsR(R_GPS_VEL_Z_BASE, altDop) * noiseScale;
-    const float gpsAltR = gpsR(R_GPS_ALT_BASE, altDop) * (1.0f + baroPreference * 2.0f) * noiseScale;
-
-    const float gpsVelocityUp = -(float)gpsSol.velned.velD;
-    const float gpsRelativeAltCm = gpsSol.llh.altCm - gpsAltOffsetCm;
-    DEBUG_SET(DEBUG_ALTITUDE, 2, lrintf(gpsRelativeAltCm / 10.0f));
-    DEBUG_SET(DEBUG_ALTITUDE, 6, lrintf(gpsVelocityUp));
-
-    kalmanUpdateVelocity(&kfUp, gpsVelocityUp, gpsVelUpR);
-    kalmanUpdatePosition(&kfUp, gpsRelativeAltCm, gpsAltR);
-
-    lastZMeasurementUs = nowUs;
-
-    zCal[CAL_Z_GPS].rawReading = gpsSol.llh.altCm;
-    zCal[CAL_Z_GPS].active = true;
-}
 #else
     UNUSED(nowUs);
 #endif
@@ -626,7 +650,7 @@ static void feedBaroMeasurements(timeUs_t nowUs)
 
     // Scale R based on altitude_prefer_baro: higher value = lower baro R = more trust
     const float baroPreference = constrainf(positionConfig()->altitude_prefer_baro * 0.01f, 0.01f, 1.0f);
-    const float baroR = R_BARO_ALT / baroPreference;    
+    const float baroR = R_BARO_ALT / baroPreference;
     kalmanUpdatePosition(&kfUp, baroAltCm - baroAltOffsetCm, baroR * noiseScale);
     lastZMeasurementUs = nowUs;
 
