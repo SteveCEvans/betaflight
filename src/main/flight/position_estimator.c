@@ -71,10 +71,10 @@
 // Q or Jerk (process noise): higher allows faster adaptations to data change / offset
 // R or Measurement noise:  higher means less trust in that input
 
-#define Q_JERK_XY         2000.0f // lower gives smoother, damped acceleration but doesn't smooth  velocity much; below 500 attenuates output acceleration
-#define R_ACCEL_XY        3000.0f // higher reduces accel influence
-#define R_GPS_VEL_BASE     300.0f // increased as DOP increases, typically 5-10x, higher allows more accel influence
-#define R_GPS_POS_BASE     300.0f      // cm^2 at pDOP=1.0, also increases as DOP widens
+#define Q_JERK_XY         3000.0f // lower gives smoother, damped acceleration but doesn't smooth  velocity much; below 500 attenuates output acceleration
+#define R_ACCEL_XY        2000.0f // higher reduces accel influence
+#define R_GPS_VEL_BASE     500.0f // increased as DOP increases, typically 5-10x, higher allows more accel influence
+#define R_GPS_POS_BASE     500.0f      // cm^2 at pDOP=1.0, also increases as DOP widens
 #define R_OPTICALFLOW_VEL  400.0f     // (cm/s)^2 at max quality
 
 #define Q_JERK_Z         3000.0f
@@ -544,18 +544,18 @@ static void feedGPSMeasurements(timeUs_t nowUs)
 
         const uint16_t xyDop = gpsDopOrFallback(gpsSol.dop.hdop, gpsSol.dop.pdop);
         const float rGpsPos = gpsR(R_GPS_POS_BASE, xyDop) * noiseScale;
-        DEBUG_SET(DEBUG_POSITION_EST, 6, lrintf(rGpsPos)); // temporary debug for testing
+        DEBUG_SET(DEBUG_POSITION_EST, 6, lrintf(rGpsPos * 0.01f)); // temporary debug for testing
+
+        // GPS velocity (NED from UBX) -> ENU
+        const float rGpsVel = gpsR(R_GPS_VEL_BASE, xyDop) * noiseScale; 
+        DEBUG_SET(DEBUG_POSITION_EST, 7, lrintf(rGpsPos* 0.01f)); // temporary debug for testing
+
+        kalmanUpdateVelocity(&kfEast, (float)gpsSol.velned.velE, rGpsVel);
+        kalmanUpdateVelocity(&kfNorth, (float)gpsSol.velned.velN, rGpsVel);
 
         kalmanUpdatePosition(&kfEast, gpsDistCm.v[EF_EAST], rGpsPos);
         kalmanUpdatePosition(&kfNorth, gpsDistCm.v[EF_NORTH], rGpsPos);
 
-        // GPS velocity (NED from UBX) -> ENU
-        const float rGpsVel = gpsR(R_GPS_VEL_BASE, xyDop) * noiseScale;
-        DEBUG_SET(DEBUG_POSITION_EST, 7, lrintf(rGpsPos)); // temporary debug for testing
-
-
-        kalmanUpdateVelocity(&kfEast, (float)gpsSol.velned.velE, rGpsVel);
-        kalmanUpdateVelocity(&kfNorth, (float)gpsSol.velned.velN, rGpsVel);
 
         lastXYMeasurementUs = nowUs;
     }
@@ -798,10 +798,10 @@ void positionEstimatorUpdate(void)
 
     // XY axes: only when a consumer is active
     if (xyEnabled && ARMING_FLAG(ARMED)) {
-        kalmanPredict(&kfEast, dt);
-        kalmanPredict(&kfNorth, dt);
-        kalmanUpdateAcceleration(&kfEast, accelEast, R_ACCEL_XY);
-        kalmanUpdateAcceleration(&kfNorth, accelNorth, R_ACCEL_XY);
+    kalmanUpdateAcceleration(&kfEast, accelEast, R_ACCEL_XY);
+    kalmanUpdateAcceleration(&kfNorth, accelNorth, R_ACCEL_XY);
+    kalmanPredict(&kfEast, dt);
+    kalmanPredict(&kfNorth, dt);
     }
 
     // Feed sensor measurements (order does not matter)
@@ -858,6 +858,11 @@ float positionEstimatorGetAltitudeCm(void)
 float positionEstimatorGetAltitudeDerivative(void)
 {
     return estimate.velocity.v[ENU_U];
+}
+
+float positionEstimatorGetVerticalAcceleration(void)
+{
+    return estimate.acceleration.v[ENU_U];
 }
 
 bool positionEstimatorIsValidXY(void)

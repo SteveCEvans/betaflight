@@ -101,40 +101,79 @@ void kalmanPredict(positionKalman_t *kf, float dt)
     }
 }
 
-static void kalmanUpdateScalar(positionKalman_t *kf, unsigned measuredState, float measurement, float R)
+// static void kalmanUpdateScalar(positionKalman_t *kf, unsigned measuredState, float measurement, float R)
+// {
+//     const float S = kf->P[measuredState][measuredState] + R;
+//     if (S < 1e-9f) {
+//         return;
+//     }
+// 
+//     float gain[KF_STATE_COUNT];
+//     float measuredRow[KF_STATE_COUNT];
+//     for (unsigned i = 0; i < KF_STATE_COUNT; i++) {
+//         gain[i] = kf->P[i][measuredState] / S;
+//         measuredRow[i] = kf->P[measuredState][i];
+//     }
+// 
+//     const float innovation = measurement - kf->x[measuredState];
+//     for (unsigned i = 0; i < KF_STATE_COUNT; i++) {
+//         kf->x[i] += gain[i] * innovation;
+//     }
+// 
+//     for (unsigned row = 0; row < KF_STATE_COUNT; row++) {
+//         for (unsigned column = 0; column < KF_STATE_COUNT; column++) {
+//             kf->P[row][column] -= gain[row] * measuredRow[column];
+//         }
+//     }
+// }
+
+void kalmanUpdatePosition(positionKalman_t *kf, float measuredPosition, float R)
 {
-    const float S = kf->P[measuredState][measuredState] + R;
+    const float S = kf->P[KF_POSITION][KF_POSITION] + R;
     if (S < 1e-9f) {
         return;
     }
 
-    float gain[KF_STATE_COUNT];
-    float measuredRow[KF_STATE_COUNT];
-    for (unsigned i = 0; i < KF_STATE_COUNT; i++) {
-        gain[i] = kf->P[i][measuredState] / S;
-        measuredRow[i] = kf->P[measuredState][i];
-    }
+    const float gain = kf->P[KF_POSITION][KF_POSITION] / S;
+    const float innovation = measuredPosition - kf->x[KF_POSITION];
 
-    const float innovation = measurement - kf->x[measuredState];
-    for (unsigned i = 0; i < KF_STATE_COUNT; i++) {
-        kf->x[i] += gain[i] * innovation;
-    }
+    kf->x[KF_POSITION] += gain * innovation;
 
-    for (unsigned row = 0; row < KF_STATE_COUNT; row++) {
-        for (unsigned column = 0; column < KF_STATE_COUNT; column++) {
-            kf->P[row][column] -= gain[row] * measuredRow[column];
-        }
-    }
+    const float scale = 1.0f - gain;
+
+    kf->P[KF_POSITION][KF_POSITION] *= scale;
+
+    kf->P[KF_POSITION][KF_VELOCITY] *= scale;
+    kf->P[KF_VELOCITY][KF_POSITION] = kf->P[KF_POSITION][KF_VELOCITY];
+
+    kf->P[KF_POSITION][KF_ACCELERATION] *= scale;
+    kf->P[KF_ACCELERATION][KF_POSITION] = kf->P[KF_POSITION][KF_ACCELERATION];
 }
 
-void kalmanUpdatePosition(positionKalman_t *kf, float measuredPos, float R)
-{
-    kalmanUpdateScalar(kf, KF_POSITION, measuredPos, R);
-}
 
-void kalmanUpdateVelocity(positionKalman_t *kf, float measuredVel, float R)
+void kalmanUpdateVelocity(positionKalman_t *kf, float measuredVelocity, float R)
 {
-    kalmanUpdateScalar(kf, KF_VELOCITY, measuredVel, R);
+    const float Pvv = kf->P[KF_VELOCITY][KF_VELOCITY];
+    const float S = Pvv + R;
+
+    if (S < 1e-9f) {
+        return;
+    }
+
+    const float gain = Pvv / S;
+    const float innovation = measuredVelocity - kf->x[KF_VELOCITY];
+
+    kf->x[KF_VELOCITY] += gain * innovation;
+
+    const float scale = 1.0f - gain;
+
+    kf->P[KF_VELOCITY][KF_VELOCITY] *= scale;
+
+    kf->P[KF_VELOCITY][KF_POSITION] *= scale;
+    kf->P[KF_POSITION][KF_VELOCITY] = kf->P[KF_VELOCITY][KF_POSITION];
+
+    kf->P[KF_VELOCITY][KF_ACCELERATION] *= scale;
+    kf->P[KF_ACCELERATION][KF_VELOCITY] = kf->P[KF_VELOCITY][KF_ACCELERATION];
 }
 
 void kalmanUpdateAcceleration(positionKalman_t *kf, float measuredAccel, float R)
