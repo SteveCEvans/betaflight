@@ -18,6 +18,7 @@ extern "C" {
 #include "flight/imu.h"
 #include "flight/position.h"
 #include "flight/position_estimator.h"
+#include "flight/position_filter.h"
 
 // STATIC_UNIT_TESTED in position_estimator.c — gravity-removed earth-frame
 // linear acceleration in ENU (cm/s^2).
@@ -321,3 +322,34 @@ TEST_F(PositionEstimatorTest, EastThrustProducesPositiveEastVelocity)
     EXPECT_GT(positionEstimatorGetEstimate()->velocity.v[ENU_E], 0.0f);
 }
 
+
+// Regression guard for the diagonal-only Kalman update. A measurement of one
+// state must correct the others through the P cross-terms. This matters most for
+// XY position: with optical flow (or GPS velocity) as the only measurement there
+// is no position measurement at all, so the P[pos][vel] term is the sole path by
+// which anything ever corrects position. Drop it and XY position degenerates
+// into an open-loop integral of velocity that drifts without bound.
+// Index order matches kalmanGetPosition/Velocity/Acceleration: 0=pos, 1=vel, 2=accel.
+TEST(PositionFilterTest, VelocityMeasurementCorrectsPositionState)
+{
+    positionKalman_t kf;
+    kalmanInit(&kf, 0.0f, 0.0f, 0.0f, 10000.0f, 10000.0f, 10000.0f, 2000.0f);
+
+    // Predict forward so the process model builds the position/velocity
+    // correlation that a real flight would have.
+    for (int i = 0; i < 10; i++) {
+        kalmanPredict(&kf, 0.01f);
+    }
+    ASSERT_GT(kf.P[0][1], 0.0f) << "no position/velocity correlation to exploit";
+
+    const float positionBefore = kalmanGetPosition(&kf);
+    const float positionVarBefore = kalmanGetPositionVariance(&kf);
+
+    kalmanUpdateVelocity(&kf, 100.0f, 400.0f); // measured 100 cm/s
+
+    EXPECT_GT(kalmanGetVelocity(&kf), 0.0f);
+    // The cross-term: a positive velocity innovation must also pull position up,
+    // and must reduce the position variance.
+    EXPECT_GT(kalmanGetPosition(&kf), positionBefore);
+    EXPECT_LT(kalmanGetPositionVariance(&kf), positionVarBefore);
+}

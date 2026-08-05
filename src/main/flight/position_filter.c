@@ -101,79 +101,46 @@ void kalmanPredict(positionKalman_t *kf, float dt)
     }
 }
 
-// static void kalmanUpdateScalar(positionKalman_t *kf, unsigned measuredState, float measurement, float R)
-// {
-//     const float S = kf->P[measuredState][measuredState] + R;
-//     if (S < 1e-9f) {
-//         return;
-//     }
-//
-//     float gain[KF_STATE_COUNT];
-//     float measuredRow[KF_STATE_COUNT];
-//     for (unsigned i = 0; i < KF_STATE_COUNT; i++) {
-//         gain[i] = kf->P[i][measuredState] / S;
-//         measuredRow[i] = kf->P[measuredState][i];
-//     }
-//
-//     const float innovation = measurement - kf->x[measuredState];
-//     for (unsigned i = 0; i < KF_STATE_COUNT; i++) {
-//         kf->x[i] += gain[i] * innovation;
-//     }
-//
-//     for (unsigned row = 0; row < KF_STATE_COUNT; row++) {
-//         for (unsigned column = 0; column < KF_STATE_COUNT; column++) {
-//             kf->P[row][column] -= gain[row] * measuredRow[column];
-//         }
-//     }
-// }
+// Correct every state from a measurement of one of them, using the full Kalman
+// gain column K = P[:][m] / S. The off-diagonal terms are not optional: with
+// optical flow (or GPS velocity) as the only XY measurement there is no position
+// measurement at all, so K[KF_POSITION] is the sole path by which anything ever
+// corrects the position state. Dropping it leaves position as an open-loop
+// integral of velocity that drifts without bound.
+static void kalmanUpdateScalar(positionKalman_t *kf, unsigned measuredState, float measurement, float R)
+{
+    const float S = kf->P[measuredState][measuredState] + R;
+    if (S < 1e-9f) {
+        return;
+    }
+
+    float gain[KF_STATE_COUNT];
+    float measuredRow[KF_STATE_COUNT];
+    for (unsigned i = 0; i < KF_STATE_COUNT; i++) {
+        gain[i] = kf->P[i][measuredState] / S;
+        measuredRow[i] = kf->P[measuredState][i];
+    }
+
+    const float innovation = measurement - kf->x[measuredState];
+    for (unsigned i = 0; i < KF_STATE_COUNT; i++) {
+        kf->x[i] += gain[i] * innovation;
+    }
+
+    for (unsigned row = 0; row < KF_STATE_COUNT; row++) {
+        for (unsigned column = 0; column < KF_STATE_COUNT; column++) {
+            kf->P[row][column] -= gain[row] * measuredRow[column];
+        }
+    }
+}
 
 void kalmanUpdatePosition(positionKalman_t *kf, float measuredPosition, float R)
 {
-    const float S = kf->P[KF_POSITION][KF_POSITION] + R;
-    if (S < 1e-9f) {
-        return;
-    }
-
-    const float gain = kf->P[KF_POSITION][KF_POSITION] / S;
-    const float innovation = measuredPosition - kf->x[KF_POSITION];
-
-    kf->x[KF_POSITION] += gain * innovation;
-
-    const float scale = 1.0f - gain;
-
-    kf->P[KF_POSITION][KF_POSITION] *= scale;
-
-    kf->P[KF_POSITION][KF_VELOCITY] *= scale;
-    kf->P[KF_VELOCITY][KF_POSITION] = kf->P[KF_POSITION][KF_VELOCITY];
-
-    kf->P[KF_POSITION][KF_ACCELERATION] *= scale;
-    kf->P[KF_ACCELERATION][KF_POSITION] = kf->P[KF_POSITION][KF_ACCELERATION];
+    kalmanUpdateScalar(kf, KF_POSITION, measuredPosition, R);
 }
-
 
 void kalmanUpdateVelocity(positionKalman_t *kf, float measuredVelocity, float R)
 {
-    const float Pvv = kf->P[KF_VELOCITY][KF_VELOCITY];
-    const float S = Pvv + R;
-
-    if (S < 1e-9f) {
-        return;
-    }
-
-    const float gain = Pvv / S;
-    const float innovation = measuredVelocity - kf->x[KF_VELOCITY];
-
-    kf->x[KF_VELOCITY] += gain * innovation;
-
-    const float scale = 1.0f - gain;
-
-    kf->P[KF_VELOCITY][KF_VELOCITY] *= scale;
-
-    kf->P[KF_VELOCITY][KF_POSITION] *= scale;
-    kf->P[KF_POSITION][KF_VELOCITY] = kf->P[KF_VELOCITY][KF_POSITION];
-
-    kf->P[KF_VELOCITY][KF_ACCELERATION] *= scale;
-    kf->P[KF_ACCELERATION][KF_VELOCITY] = kf->P[KF_VELOCITY][KF_ACCELERATION];
+    kalmanUpdateScalar(kf, KF_VELOCITY, measuredVelocity, R);
 }
 
 void kalmanUpdateAcceleration(positionKalman_t *kf, float measuredAccel, float R)
